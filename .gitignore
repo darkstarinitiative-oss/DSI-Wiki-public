@@ -5,3 +5,6 @@ __pycache__/
 # Instance config'leri makineye özel gerçek path'ler içerir — sadece template commit'lenir.
 Instances/*.json
 !Instances/default.json
+
+# Bakım/migrasyon scriptleri production'ın parçası değil (bkz. development/documentation branch).
+_Python/tools/
