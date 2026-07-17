@@ -23,6 +23,9 @@ dokümantasyon üretir; birden fazla proje/instance'ı tek bir ingest servisinde
   - `DSI-Wiki-Service-Supervisor.py` — instance JSON'larından routing config üretir, systemd
     servislerini kurar/sağlıklı tutar
   - `HTTPService/` — (planlanan) birleşik HTTP sunucu config'i
+  - `tools/` — sistemin çalışan kodu DEĞİL: bakım/migrasyon/tek seferlik scriptler
+    (source scanner, reorg planner, phase2 generator, legacy ingest engine vb.) —
+    **`production` branch'inde yok**, sadece `development`/`documentation`'da
 - `Instances/` — her wiki sistemi için bir JSON dosyası (bkz. Kurulum)
 - `Documentation_Example_schema.md` — MAIN_/SUB_/INDEP_/OBSOLETE_ key formatları, placeholder şablonları
 
