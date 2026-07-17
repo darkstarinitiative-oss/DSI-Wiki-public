@@ -25,6 +25,12 @@ Wiki için hayati olan ana fonksiyon service point (endpoint). Wiki internal bir
 - **Internal Call** -> Via API (Kütüphane üzerinden) -> LLM-Wiki App (headless)
 - **External Call** -> Http-API (Kütüphane kullanarak) -> LLM-Wiki
 
+```mermaid
+flowchart LR
+    IC["Internal Call"] --> LIB1["Kütüphane (API)"] --> APP["LLM-Wiki App (headless)"]
+    EC["External Call"] --> LIB2["Kütüphane (HTTP-API)"] --> APP
+```
+
 ## LLM-Wiki-Interpreter
 
 LLM-Wiki'ye erişen ara operatör bir instance olursa, hafızası da olabilir. O zaman bir LLM-Wiki-Interpreter gerekliliği açıktır.
@@ -44,3 +50,15 @@ Interpreter, farklı yazılım dili destekleri veren ve talepleri (Wiki talepler
 Dosya erişim mantığı Key->Context şeklindedir. Key'leri MAIN_, SUB_, INDEP_ şeklinde başlatarak 3'e bölebiliriz. Ana başlık, alt başlık, independent şeklinde 3 key türü olur. Ana başlığın içerisinden alt başlıkları refere ederiz. Independent'ları da gerektikleri yerde refere ederek erişiriz, yoksa search olmadıkça ayak altında dolaşmazlar.
 
 Sub'da da main referlenmeli ki geri gidebilesin. Böylece bunları görüntülerken de açılan akordiyon menü kullanabiliriz.
+
+```mermaid
+graph TD
+    MAIN["MAIN_topic\n[CHANGE_LOG]/[DEVLOG] optional"] -->|SUB_REFS| SUB1["SUB_topic_altbaslik1\n[MAIN] mandatory"]
+    MAIN -->|SUB_REFS| SUB2["SUB_topic_altbaslik2\n[MAIN] mandatory"]
+    SUB1 -.->|geri dön| MAIN
+    SUB2 -.->|geri dön| MAIN
+    INDEP["INDEP_konu\n(serbest, sadece search/explicit ref)"]
+    MAIN -.->|explicit referans| INDEP
+
+    OBS["OBSOLETE_topic\n(MAIN_/SUB_ prefix değişimi;\n[MAIN] bloğu varsa SUB kökenli, yoksa MAIN kökenli)"]
+```
