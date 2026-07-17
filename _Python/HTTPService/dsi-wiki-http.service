@@ -1,0 +1,13 @@
+[Unit]
+Description=DSI-Wiki HTTP Service - read-only HTTP bridge (instances/topics/wiki/search) for non-MCP callers
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/HTTPService
+ExecStart=/usr/bin/python3 /home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/HTTPService/DSI-Wiki-HTTP-Server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=zulfikar.target
