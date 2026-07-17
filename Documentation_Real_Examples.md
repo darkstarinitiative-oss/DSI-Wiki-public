@@ -131,9 +131,8 @@ STANDARD_LAYERS["changelog"] = {
   locally by the supervisor and never committed.
 
 </details>
-```
-(no [SUB_REFS] — SUB_ topics don't have further children in this schema)
-```
+
+*(no `[SUB_REFS]` block — SUB_ topics don't have further children in this schema)*
 
 ---
 
@@ -182,6 +181,5 @@ Excluding them is done two ways: (1) simply never merging those specific commits
 `production`, and (2) a `production`-only `.gitignore` rule as a redundant safety net.
 
 </details>
-```
-(no [SUB_REFS] — INDEP_ topics are reached only via explicit reference or search)
-```
+
+*(no `[SUB_REFS]` block — INDEP_ topics are reached only via explicit reference or search)*
