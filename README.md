@@ -35,6 +35,21 @@ dokümantasyon üretir; birden fazla proje/instance'ı tek bir ingest servisinde
 4. `python3 _Python/DSI-Wiki-Service-Supervisor.py` çalıştır — routing config'i üretir, systemd
    servisini kurar/başlatır
 
+## İş Akışı (Lifecycle)
+
+```mermaid
+flowchart TD
+    A["raw/&lt;topic&gt;.md yazılır"] --> B{"Daemon poll (60s) / SIGUSR1"}
+    B --> C["match_route: keyword/tag eşle"]
+    C --> D["get_base_dir + get_layers"]
+    D --> E["Dinamik prompt: documentation + standart katmanlar"]
+    E --> F["claude --print çalıştır"]
+    F --> G["Delimiter'lara göre parse et"]
+    G --> H["write_layers: overwrite veya append"]
+    H --> I["documentation/log.md güncelle"]
+    I --> J["raw dosyayı archive'a taşı"]
+```
+
 ## Kullanım
 
 - Ham not eklemek: `raw/<topic>.md` dosyasına yaz — ingest daemon'u otomatik işler (poll interval
