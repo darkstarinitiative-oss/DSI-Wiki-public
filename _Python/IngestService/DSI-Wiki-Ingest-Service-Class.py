@@ -37,8 +37,26 @@ _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None,
 # layers tanımlanmamış instance'lar için eski (sabit 3 katman) davranış — geriye dönük uyumluluk.
 LEGACY_LAYERS = {
     "documentation": {
-        "prompt": "Full markdown: Status / Problem & Motivation / Architecture / File & Directory "
-                   "Structure / Configuration / Usage / Known Issues & Limitations / Changelog."
+        "prompt": (
+            "Full markdown. Use ALL of these CORE sections, in order, every one present even "
+            "if a section is just \"Not covered in raw source.\":\n"
+            "1. Status\n"
+            "2. Problem & Motivation\n"
+            "3. TEC — Technical: architecture, file/directory structure, key classes/functions "
+            "BY NAME, data flow, algorithms, running services/processes/ports. Name actual "
+            "files and functions instead of summarizing them away — this is the section most "
+            "likely to lose detail.\n"
+            "4. Configuration — env vars, config files, ports, credential locations (never values)\n"
+            "5. Usage — concrete examples\n"
+            "6. Known Issues & Limitations\n"
+            "7. Missing Information — anything the raw source didn't cover; use this instead of "
+            "inventing content for a CORE section you don't have facts for.\n"
+            "Then, ONLY if the raw source actually discusses them (by name, more than once), add "
+            "matching CONDITIONAL sections — omit entirely otherwise, never add a placeholder for "
+            "one: ART (visual/art assets, asset pipeline), API (exposed endpoints/contracts), "
+            "DATA (database schema/data models), DEPLOYMENT (services, ports, infra), "
+            "INTEGRATIONS (external dependencies)."
+        )
     },
     "llm": {"standard": True},
     "minified": {"standard": True},
@@ -125,6 +143,8 @@ OUTPUT FORMAT (mandatory):
 RULES:
 - English only
 - Write only what is verifiable from the raw source — no hallucinations
+- If a section has no supporting facts in the raw source, write "Not covered in raw source."
+  — never invent specifics (function names, numbers, config values, endpoints) to fill it
 {route_rules}
 TOPIC: {topic}
 
