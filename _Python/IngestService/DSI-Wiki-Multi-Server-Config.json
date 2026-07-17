@@ -1,0 +1,5 @@
+{
+  "_comment": "Bu dosya DSI-Wiki-Service-Supervisor.py tarafından Instances/*.json'dan otomatik üretilir — elle düzenlenmez. Bu commit'lenmiş hâli boş şablondur.",
+  "reload_interval_seconds": 1800,
+  "routes": []
+}

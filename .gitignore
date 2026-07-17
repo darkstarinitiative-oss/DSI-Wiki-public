@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+
+# Instance config'leri makineye özel gerçek path'ler içerir — sadece template commit'lenir.
+Instances/*.json
+!Instances/default.json

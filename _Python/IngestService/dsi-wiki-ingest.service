@@ -1,0 +1,14 @@
+[Unit]
+Description=DSI-Wiki Ingest Service - polls raw/ for new notes and generates documentation/llm/minified layers via Claude CLI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/IngestService
+EnvironmentFile=/home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/IngestService/.env
+ExecStart=/usr/bin/python3 /home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/IngestService/DSI-Wiki-Ingest-Service-Class.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=zulfikar.target

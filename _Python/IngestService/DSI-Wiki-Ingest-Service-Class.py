@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""
+DSI-Wiki-Ingest-Service-Class.py — LLM-Wiki raw/ polling daemon
+Uses `claude --print` CLI for ingest; no cloud API key or Ollama required.
+"""
+import json
+import os
+import shutil
+import signal
+import subprocess
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+# SIGUSR1 ile bekleme (time.sleep) anında kesilip kuyruk hemen işlenir.
+# Otomatik/klasör-tetikli değil — sadece elle (kill -USR1) çağrıldığında devreye girer.
+_wake_event = threading.Event()
+
+
+def _handle_wake_signal(signum, frame):
+    log(">> SIGUSR1 alindi, bekleme kesiliyor, kuyruk hemen kontrol edilecek.")
+    _wake_event.set()
+
+RAW_DIR = Path(os.environ.get("LLM_WIKI_RAW_DIR", "/home/ozan/LLM-Wiki/raw"))
+ARCHIVE_DIR = Path(os.environ.get("LLM_WIKI_ARCHIVE_DIR", "/home/ozan/LLM-Wiki/raw_archive"))
+POLL_INTERVAL = int(os.environ.get("LLM_WIKI_POLL_INTERVAL", "60"))
+CLAUDE_TIMEOUT = int(os.environ.get("LLM_WIKI_CLAUDE_TIMEOUT", "600"))
+
+# Çoklu instance yönlendirme — her route kendi base_dir + layers'ını taşır (bkz.
+# Instances/*.json, DSI-Wiki-Service-Supervisor.py tarafından üretilir).
+# Eşleşme yoksa default_base_dir / default_layers kullanılır.
+ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/ozan/LLM-Wiki/ingest_routes.json"))
+ROUTES_RELOAD_INTERVAL = 1800
+_routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
+
+# layers tanımlanmamış instance'lar için eski (sabit 3 katman) davranış — geriye dönük uyumluluk.
+LEGACY_LAYERS = {
+    "documentation": {
+        "prompt": "Full markdown: Status / Problem & Motivation / Architecture / File & Directory "
+                   "Structure / Configuration / Usage / Known Issues & Limitations / Changelog."
+    },
+    "llm": {"standard": True},
+    "minified": {"standard": True},
+}
+
+# standard:true olan katmanların sabit talimatları + yazma modu (overwrite: dosyanın üzerine yazar,
+# append: mevcut dosyanın sonuna yeni giriş ekler — changelog/devlog gibi biriken katmanlar için).
+STANDARD_LAYERS = {
+    "llm": {
+        "instructions": "Condensed bullet-point version of the documentation layer, every key fact "
+                         "as a bullet, no filler prose.",
+        "mode": "overwrite",
+    },
+    "minified": {
+        "instructions": "Single dense paragraph, ~200 tokens max, current status only.",
+        "mode": "overwrite",
+    },
+    "changelog": {
+        "instructions": "ONLY the new entry for this update (Keep a Changelog style: "
+                         "Added/Changed/Fixed/Removed). Do not repeat previous entries — this will "
+                         "be appended to the existing file.",
+        "mode": "append",
+    },
+    "devlog": {
+        "instructions": "ONLY the new entry for this update: what decision or mistake was made and "
+                         "how it was resolved. Do not repeat previous entries — this will be "
+                         "appended to the existing file.",
+        "mode": "append",
+    },
+}
+
+
+def load_routes(force: bool = False):
+    now = time.time()
+    if not force and (now - _routes_cache["loaded_at"]) < ROUTES_RELOAD_INTERVAL:
+        return _routes_cache["routes"]
+    try:
+        data = json.loads(ROUTES_PATH.read_text(encoding="utf-8"))
+        _routes_cache["routes"] = data.get("routes", [])
+        _routes_cache["default_base_dir"] = data.get("default_base_dir")
+        _routes_cache["default_layers"] = data.get("default_layers")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        log(f"   !! {ROUTES_PATH.name} okunamadi ({e}), routing devre disi.")
+        _routes_cache["routes"] = []
+    _routes_cache["loaded_at"] = now
+    return _routes_cache["routes"]
+
+
+def get_base_dir(route) -> Path:
+    if route and route.get("base_dir"):
+        return Path(route["base_dir"])
+    default = _routes_cache.get("default_base_dir")
+    if not default:
+        raise RuntimeError(f"default_base_dir yok ({ROUTES_PATH}) ve route eşleşmedi — yazılacak yer belirsiz.")
+    return Path(default)
+
+
+def get_layers(route) -> dict:
+    if route and route.get("layers"):
+        return route["layers"]
+    default = _routes_cache.get("default_layers")
+    if default:
+        return default
+    return LEGACY_LAYERS
+
+
+def match_route(topic: str):
+    topic_lower = topic.lower()
+    for route in load_routes():
+        if route.get("keyword", "").lower() in topic_lower:
+            return route
+    return None
+
+
+PROMPT_HEADER = """\
+You are a technical documentation writer for the DSI (Dark Star Industries) AI system.
+
+Given the raw source notes below, produce structured wiki output in the layers listed below.
+Use the EXACT delimiter lines shown — they are parsed programmatically.
+
+OUTPUT FORMAT (mandatory):
+{layer_blocks}
+
+RULES:
+- English only
+- Write only what is verifiable from the raw source — no hallucinations
+{route_rules}
+TOPIC: {topic}
+
+RAW SOURCE:
+{raw_content}
+"""
+
+ROUTE_RULES_TEMPLATE = """\
+- This topic belongs to project route "{tag}". Add a line "Tags: {tag}" near the
+  top of the DOCUMENTATION layer (and mention it in LLM layer too), so it stays
+  searchable via wiki_search("{tag}").
+"""
+
+
+def log(msg: str):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {msg}", flush=True)
+
+
+def build_layer_instructions(layer_name: str, layer_cfg: dict) -> str:
+    if layer_name == "documentation":
+        instr = layer_cfg.get("prompt") or LEGACY_LAYERS["documentation"]["prompt"]
+        template_path = layer_cfg.get("template")
+        if template_path:
+            try:
+                tpl = Path(template_path).read_text(encoding="utf-8")
+                instr += f"\n\nFollow this output template (structure only, fill in real content):\n{tpl}"
+            except OSError as e:
+                log(f"   !! template okunamadi ({template_path}): {e}")
+        return instr
+    std = STANDARD_LAYERS.get(layer_name)
+    if std:
+        return std["instructions"]
+    return layer_cfg.get("schema", "")
+
+
+def build_prompt(topic: str, raw_content: str, layers_cfg: dict, route_rules: str) -> tuple[str, list[str]]:
+    layer_names = ["documentation"] + [n for n in layers_cfg if n != "documentation"]
+    blocks = []
+    for name in layer_names:
+        instr = build_layer_instructions(name, layers_cfg.get(name, {}))
+        blocks.append(f"==={name.upper()}===\n<{instr}>")
+    prompt = PROMPT_HEADER.format(
+        layer_blocks="\n".join(blocks),
+        route_rules=route_rules,
+        topic=topic,
+        raw_content=raw_content,
+    )
+    return prompt, layer_names
+
+
+def parse_output(stdout: str, layer_names: list[str]) -> dict[str, str] | None:
+    positions = []
+    for name in layer_names:
+        delim = f"==={name.upper()}==="
+        idx = stdout.find(delim)
+        if idx == -1:
+            return None
+        positions.append((idx, delim, name))
+    positions.sort()
+    result = {}
+    for i, (idx, delim, name) in enumerate(positions):
+        start = idx + len(delim)
+        end = positions[i + 1][0] if i + 1 < len(positions) else len(stdout)
+        result[name] = stdout[start:end].strip()
+    return result
+
+
+def write_layers(topic: str, contents: dict[str, str], layers_cfg: dict, base_dir: Path):
+    for name, content in contents.items():
+        cfg = layers_cfg.get(name, {})
+        mode = cfg.get("mode") or STANDARD_LAYERS.get(name, {}).get("mode", "overwrite")
+        layer_dir = base_dir / name
+        layer_dir.mkdir(parents=True, exist_ok=True)
+        path = layer_dir / f"{topic}.md"
+        if mode == "append":
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"\n## {ts}\n{content}\n")
+        else:
+            path.write_text(content, encoding="utf-8")
+
+    log_path = base_dir / "documentation" / "log.md"
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"- [{ts}] ingest: {topic}\n")
+
+
+def archive_file(raw_path: Path):
+    ARCHIVE_DIR.mkdir(exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    dest = ARCHIVE_DIR / f"{ts}_{raw_path.name}"
+    shutil.move(str(raw_path), str(dest))
+    log(f"   >> Archived: {dest.name}")
+
+
+def process_file(raw_path: Path):
+    topic = raw_path.stem
+    log(f"-> Processing: {raw_path.name} (topic={topic})")
+
+    route = match_route(topic)
+    route_rules = ""
+    if route:
+        log(f"   >> route matched: tag={route.get('tag')} base_dir={route.get('base_dir')}")
+        route_rules = ROUTE_RULES_TEMPLATE.format(tag=route.get("tag", ""))
+    base_dir = get_base_dir(route)
+    layers_cfg = get_layers(route)
+
+    raw_content = raw_path.read_text(encoding="utf-8")
+    prompt, layer_names = build_prompt(topic, raw_content, layers_cfg, route_rules)
+
+    log(f"   Running claude --print ... (layers={layer_names}, timeout={CLAUDE_TIMEOUT}s)")
+    try:
+        result = subprocess.run(
+            [
+                "claude", "--print",
+                "--no-session-persistence",  # no context carryover between runs
+                prompt,
+            ],
+            capture_output=True, text=True, timeout=CLAUDE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        log(f"   !! Timed out after {CLAUDE_TIMEOUT}s — skipping.")
+        return
+    except FileNotFoundError:
+        log("   !! `claude` not found in PATH — is Claude Code CLI installed?")
+        return
+
+    if result.returncode != 0:
+        log(f"   !! claude exited {result.returncode}")
+        if result.stderr:
+            log(f"      stderr: {result.stderr[:300]}")
+        return
+
+    parsed = parse_output(result.stdout, layer_names)
+    if parsed is None:
+        log("   !! Delimiter markers missing in claude output.")
+        log(f"      First 400 chars: {result.stdout[:400]}")
+        return
+
+    write_layers(topic, parsed, layers_cfg, base_dir)
+    log(f"   >> {len(parsed)} layers written for: {topic} (base_dir={base_dir}, layers={list(parsed.keys())})")
+    archive_file(raw_path)
+
+
+def get_pending_files() -> list:
+    files = list(RAW_DIR.glob("*.md"))
+    files.sort(key=lambda f: f.stat().st_mtime)
+    return files
+
+
+def main():
+    RAW_DIR.mkdir(exist_ok=True)
+    routes = load_routes(force=True)
+    signal.signal(signal.SIGUSR1, _handle_wake_signal)
+    log(f">> ingest_worker started | pid={os.getpid()} | raw={RAW_DIR} | poll={POLL_INTERVAL}s | engine=claude-cli | routes={len(routes)}")
+
+    while True:
+        load_routes()  # cache TTL'i (ROUTES_RELOAD_INTERVAL) dolmussa sessizce yeniler
+        pending = get_pending_files()
+        if pending:
+            log(f">> {len(pending)} file(s) queued.")
+            for f in pending:
+                process_file(f)
+        else:
+            log(">> Queue empty, waiting...")
+        _wake_event.wait(timeout=POLL_INTERVAL)
+        _wake_event.clear()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        log(">> Stopped (Ctrl+C).")
