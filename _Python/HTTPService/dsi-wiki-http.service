@@ -1,5 +1,5 @@
 [Unit]
-Description=DSI-Wiki HTTP Service - read-only HTTP bridge (instances/topics/wiki/search) for non-MCP callers
+Description=DSI-Wiki Gateway - combined API/MCP/UI ASGI service, mounted at /api /mcp /http
 After=network.target
 
 [Service]
