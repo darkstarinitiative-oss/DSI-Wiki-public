@@ -1,4 +1,9 @@
 {
   "port": 8430,
-  "scan_dir": "/home/ozan/CLEANUP/MAIN/DSI-Wiki/Instances"
+  "scan_dir": "/home/ozan/CLEANUP/MAIN/DSI-Wiki/Instances",
+  "subdomain_routes": {
+    "wiki-api.dsigames.com.tr": "/api",
+    "wiki-mcp.dsigames.com.tr": "/mcp",
+    "wiki-http.dsigames.com.tr": "/http"
+  }
 }
