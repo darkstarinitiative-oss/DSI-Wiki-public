@@ -43,9 +43,12 @@ ingest service.
 
 ```mermaid
 flowchart LR
-    A["write raw/topic.md"] --> B{"poll / SIGUSR1"}
+    subgraph " "
+        direction TB
+        A["write raw/topic.md"] --> B{"poll (60s)<br/>/ SIGUSR1"}
+    end
     B --> C["match_route"]
-    C --> D["get_base_dir + layers"]
+    C --> D["get_base_dir<br/>+ layers"]
     D --> E["build prompt"]
     E --> F["claude --print"]
     F --> G["parse output"]
