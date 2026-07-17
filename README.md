@@ -23,7 +23,8 @@ ingest service.
   - `IngestService/` — live ingest daemon (`DSI-Wiki-Ingest-Service-Class.py`) + routing config
   - `DSI-Wiki-Service-Supervisor.py` — generates routing config from instance JSONs, installs and
     keeps systemd services healthy
-  - `HTTPService/` — (planned) unified HTTP server config
+  - `HTTPService/` — read-only HTTP bridge (`DSI-Wiki-HTTP-Server.py`) for external callers
+    that can't speak MCP; instance-scoped `/instances`, `/topics`, `/wiki`, `/search`
   - `tools/` — NOT the system's running code: maintenance/migration/one-off scripts
     (source scanner, reorg planner, phase2 generator, legacy ingest engine, etc.) —
     **not present on the `production` branch**, only on `development`/`documentation`
@@ -61,7 +62,10 @@ flowchart LR
 
 - Add a raw note: write to `raw/<topic>.md` — the ingest daemon picks it up automatically
   (within one poll interval)
-- Read the wiki: via MCP `wiki_get(topic, layer="documentation"|"llm"|"minified"|...)`
+- Read the wiki: via MCP `wiki_get(topic, layer="documentation"|"llm"|"minified"|...)`, or over
+  plain HTTP (`python3 _Python/HTTPService/DSI-Wiki-HTTP-Server.py`): `GET /instances`,
+  `GET /topics?instance=<name>&layer=<layer>`, `GET /wiki?instance=<name>&topic=<topic>&layer=<layer>`,
+  `GET /search?instance=<name>&q=<query>&layer=<layer|all>`
 - Add an instance: new JSON under `Instances/`, then re-run the supervisor
 - Layer schema: defined in each instance JSON's `layers` field — `documentation` is free-form
   (`prompt` + optional `template` md file), `llm`/`minified`/`changelog`/`devlog` are fixed in
