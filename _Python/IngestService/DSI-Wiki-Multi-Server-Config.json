@@ -1,5 +1,30 @@
 {
   "_comment": "Bu dosya DSI-Wiki-Service-Supervisor.py tarafından Instances/*.json'dan otomatik üretilir — elle düzenlenmez. Bu commit'lenmiş hâli boş şablondur.",
   "reload_interval_seconds": 1800,
-  "routes": []
+  "routes": [
+    {
+      "keyword": "ihalemobil",
+      "tag": "wiki:ihalemobil",
+      "base_dir": "/home/ozan/ihalemobil-wiki-BASE",
+      "layers": {}
+    },
+    {
+      "keyword": "witch",
+      "tag": "wiki:witch",
+      "base_dir": "/home/ozan/codebase/projects/Burcu-WitchBoard/voice_web/voice_wiki",
+      "layers": {}
+    }
+  ],
+  "default_base_dir": "/home/ozan/CLEANUP/DATA/Wiki-BASE",
+  "default_layers": {
+    "documentation": {
+      "prompt": "Full markdown. Use ALL of these CORE sections, in order, every one present even if a section is just \"Not covered in raw source.\":\n1. Status\n2. Problem & Motivation\n3. TEC — Technical: architecture, file/directory structure, key classes/functions BY NAME, data flow, algorithms, running services/processes/ports. Name actual files and functions instead of summarizing them away — this is the section most likely to lose detail.\n4. Configuration — env vars, config files, ports, credential locations (never values)\n5. Usage — concrete examples\n6. Known Issues & Limitations\n7. Missing Information — anything the raw source didn't cover; use this instead of inventing content for a CORE section you don't have facts for.\nThen, ONLY if the raw source actually discusses them (by name, more than once), add matching CONDITIONAL sections — omit entirely otherwise, never add a placeholder for one: ART (visual/art assets, asset pipeline), API (exposed endpoints/contracts), DATA (database schema/data models), DEPLOYMENT (services, ports, infra), INTEGRATIONS (external dependencies)."
+    },
+    "llm": {
+      "prompt": "Your ENTIRE output for this layer MUST be either (A) the literal 4-line format below with real values, or (B) a fallback paragraph — nothing else. Do NOT write a bulleted list, do NOT write prose sections, do NOT summarize the documentation in your own words if format (A) applies.\n\nFORMAT (A) — use this whenever the documentation mentions ANY real directory, file/config path, command, or named endpoint/port, even just one:\nD:<dir1>,<dir2>,<dir3>\nC:<path1>,<path2>\nR:<command1>;<command2>\nX:<name>=<endpoint>,<name>=<endpoint>\nRules for (A): D=real directories/paths mentioned in the docs, C=real config/env/data file paths mentioned, R=real reference commands mentioned (e.g. `systemctl status ...`, a run script) — text only, never execute them, X=named endpoints/ports/URLs mentioned, written as name=value comma-separated pairs. Output ONLY the lines for prefixes that have real facts — omit a prefix line entirely (do not leave it empty) if the docs have nothing for it. Never invent a value. Output nothing else: no headings, no bullets, no extra sentences.\n\nFORMAT (B) — use ONLY if the documentation contains NONE of directories, config paths, commands, or endpoints/ports at all (i.e. format (A) would be 4 empty lines): write a single plain-prose paragraph, hard max 300 tokens, stating current status.\n\nExample of exact (A) output shape (illustrative values only — always use the REAL facts from the documentation, never these examples):\nD:~/CLEANUP/MAIN/DSI-Wiki,~/CLEANUP/DATA/Wiki-BASE\nC:~/CLEANUP/MAIN/DSI-Wiki/_Python/IngestService/.env\nR:systemctl --user status dsi-wiki-ingest.service\nX:api=https://wiki-api.dsigames.com.tr,mcp=https://wiki-mcp.dsigames.com.tr"
+    },
+    "minified": {
+      "prompt": "Your ENTIRE output for this layer MUST be either (A) the literal 1-line format below with real values, or (B) a fallback sentence — nothing else.\n\nFORMAT (A) — use whenever the documentation mentions ANY real named endpoint/port/URL:\nX:<name>=<endpoint>,<name>=<endpoint>\nWrite ONLY that one line, using real name=value pairs pulled from the documentation. Never invent a value. No other text.\n\nFORMAT (B) — use ONLY if the documentation mentions no real endpoint/port/URL at all: write one plain sentence, hard max 200 tokens, current status only.\n\nExample of exact (A) output shape (illustrative only, always use REAL facts, never this example):\nX:api=https://wiki-api.dsigames.com.tr,mcp=https://wiki-mcp.dsigames.com.tr"
+    }
+  }
 }

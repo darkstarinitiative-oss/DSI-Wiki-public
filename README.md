@@ -40,6 +40,46 @@ ingest service.
 4. Run `python3 _Python/DSI-Wiki-Service-Supervisor.py` — generates the routing config, installs
    and starts the systemd service
 
+### Raw vs. base directories
+
+- **Raw is global, one directory for the whole service.** Set once in
+  `_Python/IngestService/.env`:
+  - `LLM_WIKI_RAW_DIR` — where new notes are dropped (`raw/<topic>.md`), polled every
+    `LLM_WIKI_POLL_INTERVAL` seconds (or on `SIGUSR1`)
+  - `LLM_WIKI_ARCHIVE_DIR` — where a raw note is moved after successful ingest
+  - `LLM_WIKI_ROUTES` — path to the generated `DSI-Wiki-Multi-Server-Config.json` (below)
+- **Base is per-instance.** Each `Instances/<name>.json` sets its own `base_dir` — the root
+  under which that instance's `documentation/`, `llm/`, `minified/` (and any custom) layer
+  folders are written. Different instances/projects should point at different `base_dir`s so
+  their wikis don't collide.
+- **Routing (raw → instance → base_dir):** on ingest, the topic name is matched against each
+  enabled instance's `keyword` (substring match); a note can also force-route with an explicit
+  `Tags: <tag>` line matching an instance's `tag`. The first match's `base_dir` is used. If
+  nothing matches, ingest falls back to `default_base_dir` in
+  `_Python/IngestService/DSI-Wiki-Multi-Server-Config.json`.
+- **`DSI-Wiki-Multi-Server-Config.json` is generated, not hand-edited** — running
+  `DSI-Wiki-Service-Supervisor.py` rebuilds `routes` from `Instances/*.json` and sets
+  `default_base_dir` to the `base_dir` of the first enabled instance it finds. If this file is
+  ever reset to its empty committed template (`"routes": []`, no `default_base_dir`) — e.g. by a
+  `git checkout` that isn't followed by re-running the supervisor — the ingest service will
+  crash-loop on the first unrouted raw note (`RuntimeError: default_base_dir yok ...`). Fix by
+  re-running the supervisor, not by hand-patching the JSON.
+
+### Documentation layers
+
+- `documentation`, `llm`, `minified` are the three standard layers written for every topic:
+  full write-up, condensed bullet summary, and single-paragraph gist, respectively (see
+  `documentation/`, `llm/`, `minified/` under each instance's `base_dir`).
+  `changelog`/`devlog` are additional standard layers, opt-in per instance.
+- Layers are defined per instance in the `layers` field of `Instances/<name>.json`:
+  - `standard: true` layers (`llm`, `minified`, `changelog`, `devlog`) use fixed prompts baked
+    into the ingest code.
+  - `documentation` is free-form per instance — configure a custom `prompt` and/or a `template`
+    markdown file (see `Documentation_Example_schema.md` for the MAIN_/SUB_/INDEP_/OBSOLETE_ key
+    format the template should follow).
+  - Instances with no `layers` field fall back to the legacy fixed 3-layer
+    (`documentation`/`llm`/`minified`) behavior.
+
 ## Lifecycle
 
 ```mermaid

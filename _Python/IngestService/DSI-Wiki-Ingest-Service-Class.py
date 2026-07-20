@@ -34,59 +34,10 @@ ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/ozan/LLM-Wiki/ingest
 ROUTES_RELOAD_INTERVAL = 1800
 _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
 
-# layers tanımlanmamış instance'lar için eski (sabit 3 katman) davranış — geriye dönük uyumluluk.
-LEGACY_LAYERS = {
-    "documentation": {
-        "prompt": (
-            "Full markdown. Use ALL of these CORE sections, in order, every one present even "
-            "if a section is just \"Not covered in raw source.\":\n"
-            "1. Status\n"
-            "2. Problem & Motivation\n"
-            "3. TEC — Technical: architecture, file/directory structure, key classes/functions "
-            "BY NAME, data flow, algorithms, running services/processes/ports. Name actual "
-            "files and functions instead of summarizing them away — this is the section most "
-            "likely to lose detail.\n"
-            "4. Configuration — env vars, config files, ports, credential locations (never values)\n"
-            "5. Usage — concrete examples\n"
-            "6. Known Issues & Limitations\n"
-            "7. Missing Information — anything the raw source didn't cover; use this instead of "
-            "inventing content for a CORE section you don't have facts for.\n"
-            "Then, ONLY if the raw source actually discusses them (by name, more than once), add "
-            "matching CONDITIONAL sections — omit entirely otherwise, never add a placeholder for "
-            "one: ART (visual/art assets, asset pipeline), API (exposed endpoints/contracts), "
-            "DATA (database schema/data models), DEPLOYMENT (services, ports, infra), "
-            "INTEGRATIONS (external dependencies)."
-        )
-    },
-    "llm": {"standard": True},
-    "minified": {"standard": True},
-}
-
-# standard:true olan katmanların sabit talimatları + yazma modu (overwrite: dosyanın üzerine yazar,
-# append: mevcut dosyanın sonuna yeni giriş ekler — changelog/devlog gibi biriken katmanlar için).
-STANDARD_LAYERS = {
-    "llm": {
-        "instructions": "Condensed bullet-point version of the documentation layer, every key fact "
-                         "as a bullet, no filler prose.",
-        "mode": "overwrite",
-    },
-    "minified": {
-        "instructions": "Single dense paragraph, ~200 tokens max, current status only.",
-        "mode": "overwrite",
-    },
-    "changelog": {
-        "instructions": "ONLY the new entry for this update (Keep a Changelog style: "
-                         "Added/Changed/Fixed/Removed). Do not repeat previous entries — this will "
-                         "be appended to the existing file.",
-        "mode": "append",
-    },
-    "devlog": {
-        "instructions": "ONLY the new entry for this update: what decision or mistake was made and "
-                         "how it was resolved. Do not repeat previous entries — this will be "
-                         "appended to the existing file.",
-        "mode": "append",
-    },
-}
+# Tum katman talimatlari (documentation/llm/minified/changelog/devlog) ve yazma modu ("overwrite"/
+# "append") sadece Instances/*.json -> layers.<layer>.prompt/mode alanindan gelir. Kodda hicbir
+# sabit/varsayilan talimat metni tutulmaz — bir instance kendi layers'ini tanimlamazsa o katman
+# hic uretilmez (bkz. get_layers()).
 
 
 def load_routes(force: bool = False):
@@ -117,10 +68,7 @@ def get_base_dir(route) -> Path:
 def get_layers(route) -> dict:
     if route and route.get("layers"):
         return route["layers"]
-    default = _routes_cache.get("default_layers")
-    if default:
-        return default
-    return LEGACY_LAYERS
+    return _routes_cache.get("default_layers") or {}
 
 
 def match_route(topic: str):
@@ -158,6 +106,44 @@ ROUTE_RULES_TEMPLATE = """\
   searchable via wiki_search("{tag}").
 """
 
+# MAIN_<name> / SUB_<name>_<sub> hiyerarsisi: llm+minified katmanlari her zaman
+# MAIN seviyesinde tek dosyada konsolide edilir, sub'lar kendi llm/minified'ini
+# uretmez (sadece documentation layer'i kendi dosyasina yazar).
+CONSOLIDATED_LAYER_NAMES = ("llm", "minified")
+
+CONSOLIDATE_PROMPT_HEADER = """\
+You are a technical documentation writer for the DSI (Dark Star Industries) AI system.
+
+Below are one or more DOCUMENTATION-layer wiki pages: the main topic page and/or its
+sub-module pages. Produce a SINGLE consolidated output per layer listed below that
+covers the main topic AND all its sub-modules together as one coherent whole —
+do not produce one block per source page, and do not just concatenate them.
+
+OUTPUT FORMAT (mandatory):
+{layer_blocks}
+
+RULES:
+- English only
+- Write only what is verifiable from the source pages below — no hallucinations
+- If a layer has no supporting facts anywhere in the sources, write
+  "Not covered in source documentation."
+{route_rules}
+TOPIC: {topic}
+
+SOURCE DOCUMENTATION PAGES:
+{raw_content}
+"""
+
+
+def parse_hierarchical_topic(topic: str) -> str | None:
+    """MAIN_<name> or SUB_<name>_<sub> -> 'MAIN_<name>'; anything else -> None."""
+    parts = topic.split("_")
+    if parts[0] == "MAIN" and len(parts) == 2:
+        return topic
+    if parts[0] == "SUB" and len(parts) == 3:
+        return f"MAIN_{parts[1]}"
+    return None
+
 
 def log(msg: str):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -165,20 +151,7 @@ def log(msg: str):
 
 
 def build_layer_instructions(layer_name: str, layer_cfg: dict) -> str:
-    if layer_name == "documentation":
-        instr = layer_cfg.get("prompt") or LEGACY_LAYERS["documentation"]["prompt"]
-        template_path = layer_cfg.get("template")
-        if template_path:
-            try:
-                tpl = Path(template_path).read_text(encoding="utf-8")
-                instr += f"\n\nFollow this output template (structure only, fill in real content):\n{tpl}"
-            except OSError as e:
-                log(f"   !! template okunamadi ({template_path}): {e}")
-        return instr
-    std = STANDARD_LAYERS.get(layer_name)
-    if std:
-        return std["instructions"]
-    return layer_cfg.get("schema", "")
+    return layer_cfg.get("prompt", "")
 
 
 def build_prompt(topic: str, raw_content: str, layers_cfg: dict, route_rules: str) -> tuple[str, list[str]]:
@@ -216,7 +189,7 @@ def parse_output(stdout: str, layer_names: list[str]) -> dict[str, str] | None:
 def write_layers(topic: str, contents: dict[str, str], layers_cfg: dict, base_dir: Path):
     for name, content in contents.items():
         cfg = layers_cfg.get(name, {})
-        mode = cfg.get("mode") or STANDARD_LAYERS.get(name, {}).get("mode", "overwrite")
+        mode = cfg.get("mode", "overwrite")
         layer_dir = base_dir / name
         layer_dir.mkdir(parents=True, exist_ok=True)
         path = layer_dir / f"{topic}.md"
@@ -241,6 +214,68 @@ def archive_file(raw_path: Path):
     log(f"   >> Archived: {dest.name}")
 
 
+def regenerate_consolidated_layers(main_topic: str, base_dir: Path, layers_cfg: dict, route_rules: str):
+    """Rebuilds llm/minified for `main_topic` from ALL known documentation pages
+    (the main page itself + every SUB_<name>_* page found), overwriting the single
+    MAIN-level llm/minified files. Called after any MAIN or SUB raw ingest."""
+    layer_names = [n for n in CONSOLIDATED_LAYER_NAMES if n in layers_cfg]
+    if not layer_names:
+        return
+
+    main_name = main_topic[len("MAIN_"):]
+    doc_dir = base_dir / "documentation"
+    sources = []
+    main_doc = doc_dir / f"{main_topic}.md"
+    if main_doc.exists():
+        sources.append((main_topic, main_doc.read_text(encoding="utf-8")))
+    for sub_doc in sorted(doc_dir.glob(f"SUB_{main_name}_*.md")):
+        sources.append((sub_doc.stem, sub_doc.read_text(encoding="utf-8")))
+
+    if not sources:
+        log(f"   !! consolidate: no documentation found for {main_topic}, skipping.")
+        return
+
+    combined = "\n\n".join(f"=== SOURCE: {name} ===\n{text}" for name, text in sources)
+    blocks = []
+    for name in layer_names:
+        instr = build_layer_instructions(name, layers_cfg.get(name, {}))
+        blocks.append(f"==={name.upper()}===\n<{instr}>")
+    prompt = CONSOLIDATE_PROMPT_HEADER.format(
+        layer_blocks="\n".join(blocks),
+        route_rules=route_rules,
+        topic=main_topic,
+        raw_content=combined,
+    )
+
+    log(f"   Consolidating {layer_names} for {main_topic} from {len(sources)} source page(s)...")
+    try:
+        result = subprocess.run(
+            ["claude", "--print", "--no-session-persistence", prompt],
+            capture_output=True, text=True, timeout=CLAUDE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        log(f"   !! consolidate timed out after {CLAUDE_TIMEOUT}s — skipping.")
+        return
+    except FileNotFoundError:
+        log("   !! `claude` not found in PATH — is Claude Code CLI installed?")
+        return
+
+    if result.returncode != 0:
+        log(f"   !! consolidate claude exited {result.returncode}")
+        if result.stderr:
+            log(f"      stderr: {result.stderr[:300]}")
+        return
+
+    parsed = parse_output(result.stdout, layer_names)
+    if parsed is None:
+        log("   !! consolidate: delimiter markers missing in claude output.")
+        log(f"      First 400 chars: {result.stdout[:400]}")
+        return
+
+    write_layers(main_topic, parsed, layers_cfg, base_dir)
+    log(f"   >> consolidated {list(parsed.keys())} written for: {main_topic} (from {len(sources)} source page(s))")
+
+
 def process_file(raw_path: Path):
     topic = raw_path.stem
     log(f"-> Processing: {raw_path.name} (topic={topic})")
@@ -253,8 +288,16 @@ def process_file(raw_path: Path):
     base_dir = get_base_dir(route)
     layers_cfg = get_layers(route)
 
+    main_topic = parse_hierarchical_topic(topic)
+    consolidate = main_topic is not None and any(n in layers_cfg for n in CONSOLIDATED_LAYER_NAMES)
+    file_layers_cfg = layers_cfg
+    if consolidate:
+        # MAIN_/SUB_ topics never get their own llm/minified — those are always
+        # regenerated at the MAIN level below, from all known documentation pages.
+        file_layers_cfg = {n: cfg for n, cfg in layers_cfg.items() if n not in CONSOLIDATED_LAYER_NAMES}
+
     raw_content = raw_path.read_text(encoding="utf-8")
-    prompt, layer_names = build_prompt(topic, raw_content, layers_cfg, route_rules)
+    prompt, layer_names = build_prompt(topic, raw_content, file_layers_cfg, route_rules)
 
     log(f"   Running claude --print ... (layers={layer_names}, timeout={CLAUDE_TIMEOUT}s)")
     try:
@@ -285,8 +328,12 @@ def process_file(raw_path: Path):
         log(f"      First 400 chars: {result.stdout[:400]}")
         return
 
-    write_layers(topic, parsed, layers_cfg, base_dir)
+    write_layers(topic, parsed, file_layers_cfg, base_dir)
     log(f"   >> {len(parsed)} layers written for: {topic} (base_dir={base_dir}, layers={list(parsed.keys())})")
+
+    if consolidate:
+        regenerate_consolidated_layers(main_topic, base_dir, layers_cfg, route_rules)
+
     archive_file(raw_path)
 
 
