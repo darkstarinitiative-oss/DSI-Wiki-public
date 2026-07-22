@@ -6,5 +6,6 @@ __pycache__/
 Instances/*.json
 !Instances/default.json
 
-# Bakım/migrasyon scriptleri production'ın parçası değil (bkz. development/documentation branch).
-_Python/tools/
+# generated output
+reports/
+*.bak

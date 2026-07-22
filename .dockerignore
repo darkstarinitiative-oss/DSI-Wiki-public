@@ -1,0 +1,8 @@
+.git
+**/__pycache__
+*.pyc
+*.bak
+reports/
+_Python/IngestService/.env
+Instances/*.json
+!Instances/default.json
