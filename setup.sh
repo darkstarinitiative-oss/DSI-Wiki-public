@@ -50,11 +50,11 @@ else
     echo " * Instances/$WIKI_INSTANCE_NAME.json created."
 fi
 
-# 3. Adapt systemd unit paths to this clone
-for unit in "$ROOT"/_Python/*/*.service; do
-    sed -i "s|/home/ozan/CLEANUP/MAIN/DSI-Wiki|$ROOT|g" "$unit"
+# 3. Adapt systemd unit + config paths to this clone
+for f in "$ROOT"/_Python/*/*.service "$ROOT"/_Python/HTTPService/DSI-Wiki-HTTP-Config.json; do
+    sed -i "s|/home/ozan/CLEANUP/MAIN/DSI-Wiki|$ROOT|g" "$f"
 done
-echo " * unit paths point at $ROOT."
+echo " * unit + config paths point at $ROOT."
 
 # 4. Supervisor (generates routing config, installs + starts services)
 if [ "$NO_SYSTEMD" = 1 ]; then
