@@ -17,7 +17,7 @@ if _scripts_root not in sys.path:
 from HTTPService.api_app import load_instances, get_content
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0"
+MODEL = "qwen3-worker"
 PROMPT = (
     "Compare the factual claims (model names, file paths, ports, commands, statuses) "
     "in these two texts. Reply with exactly CONSISTENT if they do not contradict each "

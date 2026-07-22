@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 DSI-Wiki-Ingest-Service-Class.py — LLM-Wiki raw/ polling daemon
-Uses Bonsai-27B via Ollama's /api/chat for ingest (2026-07-20 DSI-Agent-Profiles
-Model-Priority decision: worker/ingest tier = Bonsai-27B, thinking=false).
+Uses Qwen3-8B via Ollama's /api/chat for ingest (2026-07-20 DSI-Agent-Profiles
+Model-Priority decision: worker/ingest tier = Qwen3-8B, thinking=false).
 """
 import json
 import os
@@ -37,13 +37,13 @@ ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/ozan/LLM-Wiki/ingest
 ROUTES_RELOAD_INTERVAL = 1800
 _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
 
-# Bonsai-27B (real: hf.co/prism-ml/Bonsai-27B-gguf:Q1_0) via local Ollama.
+# Qwen3-8B (real: qwen3-worker) via local Ollama.
 # thinking defaults to False: benchmarked ~15x faster than thinking=True on this
 # task class with no measurable quality loss (see SUB_DSI-Agent-Profiles_Model-Priority).
 # Note: thinking is only actually suppressed via /api/chat's top-level `think`
 # field — /api/generate and prompt-level "/no_think" do NOT work on this model.
 OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://localhost:11434/api/chat")
-OLLAMA_MODEL = os.environ.get("LLM_WIKI_OLLAMA_MODEL", "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0")
+OLLAMA_MODEL = os.environ.get("LLM_WIKI_OLLAMA_MODEL", "qwen3-worker")
 OLLAMA_NUM_CTX = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_CTX", "16384"))
 OLLAMA_NUM_PREDICT = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_PREDICT", "6000"))
 OLLAMA_THINK = os.environ.get("LLM_WIKI_OLLAMA_THINK", "false").lower() == "true"
@@ -57,7 +57,7 @@ class _LLMResult:
 
 
 def run_llm(prompt: str, timeout: int) -> _LLMResult:
-    """Calls Bonsai-27B via Ollama's /api/chat. Mirrors the subprocess.CompletedProcess
+    """Calls Qwen3-8B via Ollama's /api/chat. Mirrors the subprocess.CompletedProcess
     interface (.returncode/.stdout/.stderr) the call sites already expect."""
     payload = json.dumps({
         "model": OLLAMA_MODEL,

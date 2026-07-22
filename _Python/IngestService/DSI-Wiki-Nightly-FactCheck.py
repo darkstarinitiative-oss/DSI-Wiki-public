@@ -15,7 +15,7 @@ from pathlib import Path
 import urllib.request
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-MODEL = "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0"
+MODEL = "qwen3-worker"
 INSTANCES_DIR = Path("/home/ozan/CLEANUP/MAIN/DSI-Wiki/Instances")
 LOG_DIR = Path("/home/ozan/CLEANUP/DATA/Wiki-BASE/_nightly_factcheck_logs")
 SAFE_ROOT = Path("/home/ozan").resolve()
