@@ -56,7 +56,7 @@ def main():
         sys.stderr.write("error: give --topic <name> or --all\n")
         sys.exit(2)
 
-    scan_dir = os.path.expanduser("~/CLEANUP/MAIN/DSI-Wiki/Instances")
+    scan_dir = str(Path(__file__).resolve().parent.parent.parent / "Instances")
     instances = load_instances(scan_dir)
     if args.instance not in instances:
         sys.stderr.write("unknown instance: " + args.instance + "\n")
@@ -72,7 +72,7 @@ def main():
             if f.endswith(".md") and f != "log.md"
         )
 
-    report_dir = os.path.expanduser("~/CLEANUP/MAIN/DSI-Wiki/reports")
+    report_dir = str(Path(__file__).resolve().parent.parent.parent / "reports")
     os.makedirs(report_dir, exist_ok=True)
     report_path = os.path.join(
         report_dir, "internal-scan-" + date.today().strftime("%Y%m%d") + ".md"

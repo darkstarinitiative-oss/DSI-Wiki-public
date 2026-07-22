@@ -23,6 +23,8 @@ def load_instances(scan_dir):
             data = json.loads(open(os.path.join(scan_dir, fname), encoding="utf-8").read())
         except (OSError, json.JSONDecodeError):
             continue
+        if not isinstance(data, dict):  # skip stray/malformed non-object JSON
+            continue
         if not data.get("enabled") or data.get("base_dir") in (None, "N/A"):
             continue
         instances[data.get("name", fname[:-5])] = data

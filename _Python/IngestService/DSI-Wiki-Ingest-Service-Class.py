@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
 DSI-Wiki-Ingest-Service-Class.py — LLM-Wiki raw/ polling daemon
-Uses `claude --print` CLI for ingest; no cloud API key or Ollama required.
+Uses Bonsai-27B via Ollama's /api/chat for ingest (2026-07-20 DSI-Agent-Profiles
+Model-Priority decision: worker/ingest tier = Bonsai-27B, thinking=false).
 """
 import json
 import os
 import shutil
 import signal
-import subprocess
+import socket
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,6 +36,51 @@ CLAUDE_TIMEOUT = int(os.environ.get("LLM_WIKI_CLAUDE_TIMEOUT", "600"))
 ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/ozan/LLM-Wiki/ingest_routes.json"))
 ROUTES_RELOAD_INTERVAL = 1800
 _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
+
+# Bonsai-27B (real: hf.co/prism-ml/Bonsai-27B-gguf:Q1_0) via local Ollama.
+# thinking defaults to False: benchmarked ~15x faster than thinking=True on this
+# task class with no measurable quality loss (see SUB_DSI-Agent-Profiles_Model-Priority).
+# Note: thinking is only actually suppressed via /api/chat's top-level `think`
+# field — /api/generate and prompt-level "/no_think" do NOT work on this model.
+OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://localhost:11434/api/chat")
+OLLAMA_MODEL = os.environ.get("LLM_WIKI_OLLAMA_MODEL", "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0")
+OLLAMA_NUM_CTX = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_CTX", "16384"))
+OLLAMA_NUM_PREDICT = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_PREDICT", "6000"))
+OLLAMA_THINK = os.environ.get("LLM_WIKI_OLLAMA_THINK", "false").lower() == "true"
+
+
+class _LLMResult:
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def run_llm(prompt: str, timeout: int) -> _LLMResult:
+    """Calls Bonsai-27B via Ollama's /api/chat. Mirrors the subprocess.CompletedProcess
+    interface (.returncode/.stdout/.stderr) the call sites already expect."""
+    payload = json.dumps({
+        "model": OLLAMA_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "think": OLLAMA_THINK,
+        "options": {"num_ctx": OLLAMA_NUM_CTX, "num_predict": OLLAMA_NUM_PREDICT},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        OLLAMA_URL, data=payload,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except socket.timeout as e:
+        raise TimeoutError(str(e)) from e
+    except urllib.error.URLError as e:
+        raise ConnectionError(f"ollama not reachable at {OLLAMA_URL}: {e}") from e
+    if "error" in body:
+        return _LLMResult(1, "", str(body["error"]))
+    content = body.get("message", {}).get("content", "")
+    return _LLMResult(0, content, "")
 
 # Tum katman talimatlari (documentation/llm/minified/changelog/devlog) ve yazma modu ("overwrite"/
 # "append") sadece Instances/*.json -> layers.<layer>.prompt/mode alanindan gelir. Kodda hicbir
@@ -247,28 +295,24 @@ def regenerate_consolidated_layers(main_topic: str, base_dir: Path, layers_cfg: 
         raw_content=combined,
     )
 
-    log(f"   Consolidating {layer_names} for {main_topic} from {len(sources)} source page(s)...")
+    log(f"   Consolidating {layer_names} for {main_topic} from {len(sources)} source page(s)"
+        f" via bonsai ({OLLAMA_MODEL}, think={OLLAMA_THINK})...")
     try:
-        result = subprocess.run(
-            ["claude", "--print", "--no-session-persistence", prompt],
-            capture_output=True, text=True, timeout=CLAUDE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
+        result = run_llm(prompt, timeout=CLAUDE_TIMEOUT)
+    except TimeoutError:
         log(f"   !! consolidate timed out after {CLAUDE_TIMEOUT}s — skipping.")
         return
-    except FileNotFoundError:
-        log("   !! `claude` not found in PATH — is Claude Code CLI installed?")
+    except ConnectionError as e:
+        log(f"   !! consolidate: {e}")
         return
 
     if result.returncode != 0:
-        log(f"   !! consolidate claude exited {result.returncode}")
-        if result.stderr:
-            log(f"      stderr: {result.stderr[:300]}")
+        log(f"   !! consolidate bonsai error: {result.stderr[:300]}")
         return
 
     parsed = parse_output(result.stdout, layer_names)
     if parsed is None:
-        log("   !! consolidate: delimiter markers missing in claude output.")
+        log("   !! consolidate: delimiter markers missing in bonsai output.")
         log(f"      First 400 chars: {result.stdout[:400]}")
         return
 
@@ -299,32 +343,23 @@ def process_file(raw_path: Path):
     raw_content = raw_path.read_text(encoding="utf-8")
     prompt, layer_names = build_prompt(topic, raw_content, file_layers_cfg, route_rules)
 
-    log(f"   Running claude --print ... (layers={layer_names}, timeout={CLAUDE_TIMEOUT}s)")
+    log(f"   Running bonsai ({OLLAMA_MODEL}, think={OLLAMA_THINK}) ... (layers={layer_names}, timeout={CLAUDE_TIMEOUT}s)")
     try:
-        result = subprocess.run(
-            [
-                "claude", "--print",
-                "--no-session-persistence",  # no context carryover between runs
-                prompt,
-            ],
-            capture_output=True, text=True, timeout=CLAUDE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
+        result = run_llm(prompt, timeout=CLAUDE_TIMEOUT)
+    except TimeoutError:
         log(f"   !! Timed out after {CLAUDE_TIMEOUT}s — skipping.")
         return
-    except FileNotFoundError:
-        log("   !! `claude` not found in PATH — is Claude Code CLI installed?")
+    except ConnectionError as e:
+        log(f"   !! {e}")
         return
 
     if result.returncode != 0:
-        log(f"   !! claude exited {result.returncode}")
-        if result.stderr:
-            log(f"      stderr: {result.stderr[:300]}")
+        log(f"   !! bonsai error: {result.stderr[:300]}")
         return
 
     parsed = parse_output(result.stdout, layer_names)
     if parsed is None:
-        log("   !! Delimiter markers missing in claude output.")
+        log("   !! Delimiter markers missing in bonsai output.")
         log(f"      First 400 chars: {result.stdout[:400]}")
         return
 
@@ -347,7 +382,8 @@ def main():
     RAW_DIR.mkdir(exist_ok=True)
     routes = load_routes(force=True)
     signal.signal(signal.SIGUSR1, _handle_wake_signal)
-    log(f">> ingest_worker started | pid={os.getpid()} | raw={RAW_DIR} | poll={POLL_INTERVAL}s | engine=claude-cli | routes={len(routes)}")
+    log(f">> ingest_worker started | pid={os.getpid()} | raw={RAW_DIR} | poll={POLL_INTERVAL}s | "
+        f"engine=bonsai-ollama:{OLLAMA_MODEL}:think={OLLAMA_THINK} | routes={len(routes)}")
 
     while True:
         load_routes()  # cache TTL'i (ROUTES_RELOAD_INTERVAL) dolmussa sessizce yeniler

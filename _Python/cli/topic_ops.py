@@ -15,7 +15,7 @@ LAYERS = ('raw', 'documentation', 'llm', 'minified', 'changelog', 'devlog')
 
 
 def _base_dir():
-    scan_dir = os.path.expanduser('~/CLEANUP/MAIN/DSI-Wiki/Instances')
+    scan_dir = str(Path(__file__).resolve().parent.parent.parent / "Instances")
     return load_instances(scan_dir)['Cain-the-elder']['base_dir']
 
 

@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--layer", default="minified")
     args = parser.parse_args()
 
-    scan_dir = os.path.expanduser("~/CLEANUP/MAIN/DSI-Wiki/Instances")
+    scan_dir = str(Path(__file__).resolve().parent.parent.parent / "Instances")
     instances = load_instances(scan_dir)
     if args.instance not in instances:
         print(f"instance not found: {args.instance}", file=sys.stderr)
