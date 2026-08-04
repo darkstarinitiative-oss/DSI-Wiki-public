@@ -1,0 +1,13 @@
+[Unit]
+Description=DSI-Wiki Gateway - combined API/MCP/UI ASGI service, mounted at /api /mcp /http
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ozan/BASE/MAIN/DSI-Wiki/CODE/gateway
+ExecStart=/usr/bin/python3 /home/ozan/BASE/MAIN/DSI-Wiki/CODE/gateway/DSI-Wiki-HTTP-Server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=zulfikar.target

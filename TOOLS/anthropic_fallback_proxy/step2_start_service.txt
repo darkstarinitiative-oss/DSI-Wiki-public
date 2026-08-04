@@ -1,0 +1,23 @@
+# Step 2: Start claude-fallback-proxy service
+
+## Commands executed
+
+```bash
+sudo systemctl start claude-fallback-proxy.service
+```
+
+## Verify service status
+
+```bash
+sudo systemctl status claude-fallback-proxy.service
+```
+
+The service should be **active (running)** without errors.
+
+## If the service fails to start
+
+Capture recent logs for debugging:
+
+```bash
+journalctl -u claude-fallback-proxy.service -n 50 --no-pager
+```

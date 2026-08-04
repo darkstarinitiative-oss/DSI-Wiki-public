@@ -3,6 +3,7 @@
 *.pyc
 *.bak
 reports/
-_Python/IngestService/.env
-Instances/*.json
-!Instances/default.json
+CODE/ingest/.env
+JSONS/instances/*.json
+!JSONS/instances/default.json
+SERVICES/.env
