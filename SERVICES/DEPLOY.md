@@ -169,7 +169,36 @@ If the raw file never disappears: check `docker logs <ingest-container-name> --t
 `ConnectionError`/`TimeoutError` — see step 1 (Ollama bind address) and the timeout note in step
 3 first; those are the two failure modes actually seen during development.
 
-## 7. Done
+## 7. Install the CLI proxies (recommended)
+
+Docker deployments don't get `~/.local/bin/DSI-wiki-*` for free the way `setup.sh`'s
+native/systemd path does — `SKILLS/cli/*.py` only exists inside the containers. Run once:
+
+```
+bash TOOLS/install-cli-proxies.sh
+```
+
+This generates host-side wrappers that proxy each call through `docker compose exec` (reads via
+`gateway`, writes via `ingest` — see the script's comments for why). See README.md's Usage
+section for the resulting command list.
+
+## 8. Bootstrap self-documentation (recommended)
+
+DSI-Wiki can document itself the same way it documents anything else: open a `MAIN_<ProjectName>`
+topic for *this* deployment and feed it the project's own README/DOCS/architecture as raw notes
+(see `INDEP_WIKI-RULES` for the exact MAIN_/SUB_/INDEP_ format once that topic exists in your
+instance). Concretely, once step 6 has proven ingest works end-to-end:
+
+```
+cat DOCS/architecture.md DOCS/naming-conventions.md README.md \
+    > "$WIKI_RAW_DIR/MAIN_<ProjectName>.md"
+```
+
+wait one poll interval, then confirm all four layers exist for it via `DSI-wiki-get`. This gives
+any agent or teammate who later connects to this deployment a real, queryable description of the
+deployment itself — not just the generic repo docs.
+
+## 9. Done
 
 At this point: package builds, gateway serves, CLI reads, and a real note went through ingest →
 Ollama → all four layers → archive. This is the "first stake" — DSI-Wiki running as the first
@@ -178,4 +207,5 @@ service on this server, cloned straight from `gitlab.com/darkstarinitiative/DSI-
 Next steps from here are ordinary operations, not part of this playbook: point real raw-note
 sources at `$WIKI_RAW_DIR`, add real instances under `SERVICES/instances.container/` + rebuild as
 needed, and consider `systemctl enable` equivalents / a reverse proxy in front of `:8430` if this
-is meant to be reachable outside the LAN.
+is meant to be reachable outside the LAN. For commit/branch/versioning conventions once you start
+changing this deployment's code, see `INDEP_GIT_RULES`.

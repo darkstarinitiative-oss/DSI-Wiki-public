@@ -96,7 +96,13 @@ DSI-wiki-delete <topic>            # across all layers
 DSI-wiki-internal-scan --topic <t> | --all   # doc-vs-minified drift report
 ```
 
-(Wrappers in `~/.local/bin/` -> `SKILLS/cli/*.py`; they read the layer files directly.)
+(Wrappers in `~/.local/bin/` -> `SKILLS/cli/*.py`; they read the layer files directly.
+Native/systemd deployments get these for free from `setup.sh`. **Docker deployments**
+(`SERVICES/DEPLOY.md`) need them installed separately, since `SKILLS/cli/*.py` only exists
+inside the containers: run `bash TOOLS/install-cli-proxies.sh` once, from the repo root, to
+generate `~/.local/bin/DSI-wiki-*` wrappers that proxy each call through
+`docker compose exec` — reads go to `gateway`, writes (`rename`/`delete`) go to `ingest`,
+since `gateway`'s `WIKI_BASE_DIR` mount is read-only.)
 
 **Read (external):** HTTP gateway on `:8430` — `GET /api/instances`,
 `GET /api/topics?instance=&layer=`, `GET /api/wiki?instance=&topic=&layer=`,
