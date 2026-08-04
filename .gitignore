@@ -3,9 +3,10 @@ __pycache__/
 *.pyc
 
 # Instance config'leri makineye özel gerçek path'ler içerir — sadece template commit'lenir.
-Instances/*.json
-!Instances/default.json
+JSONS/instances/*.json
+!JSONS/instances/default.json
 
 # generated output
 reports/
 *.bak
+/STATUS.json

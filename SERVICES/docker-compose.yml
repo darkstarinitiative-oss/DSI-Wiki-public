@@ -1,0 +1,62 @@
+# DSI-Wiki — two services from one image (see Dockerfile): `ingest` (polling daemon,
+# no published port) and `gateway` (API/MCP/UI on :8430). Both reach the HOST's Ollama
+# over a bridge network via host.docker.internal — Ollama itself is not containerized.
+#
+# Usage:
+#   cp .env.example .env   # fill in host paths + Ollama URL/model
+#   docker compose -f SERVICES/docker-compose.yml up -d
+#
+# (Run from anywhere — this file's relative paths are resolved relative to its own
+# location, and `--env-file` defaults to a .env next to it if you invoke compose with
+# `-f SERVICES/docker-compose.yml` from the repo root; pass `--env-file SERVICES/.env`
+# explicitly if you invoke it from elsewhere.)
+
+x-common: &common
+  build:
+    context: ..
+    dockerfile: SERVICES/Dockerfile
+  image: dsi-wiki:latest
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  environment:
+    LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
+    LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+    WIKI_BASE_DIR: /data/base
+    INSTANCES_DIR: /app/JSONS/instances
+    WIKI_STATUS_PATH: /data/status/STATUS.json
+
+services:
+  ingest:
+    <<: *common
+    command: ["python3", "CODE/ingest/DSI-Wiki-Ingest-Service-Class.py"]
+    environment:
+      LLM_WIKI_RAW_DIR: /data/raw
+      LLM_WIKI_ARCHIVE_DIR: /data/archive
+      LLM_WIKI_POLL_INTERVAL: ${LLM_WIKI_POLL_INTERVAL:-60}
+      LLM_WIKI_CLAUDE_TIMEOUT: ${LLM_WIKI_CLAUDE_TIMEOUT:-300}
+      LLM_WIKI_ROUTES: /app/JSONS/DSI-Wiki-Multi-Server-Config.json
+      LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
+      LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+      WIKI_BASE_DIR: /data/base
+      WIKI_LOCK_DIR: /data/lock
+      INSTANCES_DIR: /app/JSONS/instances
+      WIKI_STATUS_PATH: /data/status/STATUS.json
+    volumes:
+      - ${WIKI_RAW_DIR:?set WIKI_RAW_DIR in .env}:/data/raw
+      - ${WIKI_ARCHIVE_DIR:?set WIKI_ARCHIVE_DIR in .env}:/data/archive
+      - ${WIKI_BASE_DIR:?set WIKI_BASE_DIR in .env}:/data/base
+      - ${WIKI_LOCK_DIR:-/tmp/dsi-wiki-lock}:/data/lock
+      - wiki-status:/data/status
+
+  gateway:
+    <<: *common
+    command: ["python3", "CODE/gateway/DSI-Wiki-HTTP-Server.py"]
+    ports:
+      - "${SERVICE_PORT:-8430}:8430"
+    volumes:
+      - ${WIKI_BASE_DIR:?set WIKI_BASE_DIR in .env}:/data/base:ro
+      - wiki-status:/data/status:ro
+
+volumes:
+  wiki-status:
