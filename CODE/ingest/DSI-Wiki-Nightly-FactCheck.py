@@ -33,7 +33,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 INSTANCES_DIR = Path(os.environ.get("INSTANCES_DIR", str(REPO_ROOT / "JSONS" / "instances")))
 WIKI_BASE_DIR = os.environ.get("WIKI_BASE_DIR", "/home/ozan/CLEANUP/DATA/Wiki-BASE")
 LOG_DIR = Path(WIKI_BASE_DIR) / "_nightly_factcheck_logs"
-SAFE_ROOT = Path("/home/ozan").resolve()
+# Read-only sandbox root for the whitelisted toolset below. Was a hardcoded
+# /home/ozan, which doesn't cover a deployment whose repo/data live under a
+# different root (e.g. /BIG) -- make it match wherever this deployment actually
+# put things.
+SAFE_ROOT = Path(os.environ.get("NIGHTLY_FACTCHECK_SAFE_ROOT", "/home/ozan")).resolve()
 MAX_TOOL_TURNS = 8
 SKIP_TOPICS = {"INDEP_LLM_RULES"}
 

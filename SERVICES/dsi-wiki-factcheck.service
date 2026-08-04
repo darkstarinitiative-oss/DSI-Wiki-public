@@ -1,0 +1,14 @@
+[Unit]
+Description=DSI-Wiki Nightly Fact-Check - verifies documentation layers against live system state
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/BIG/PROJECTS/DSI/DSI-WIKI/CODE/ingest
+EnvironmentFile=/BIG/PROJECTS/DSI/DSI-WIKI/SERVICES/.env
+# Overrides after EnvironmentFile win: SERVICES/.env's LLM_WIKI_OLLAMA_URL uses
+# host.docker.internal, which only resolves inside the Docker containers -- this
+# unit runs natively on the host, where Ollama is reachable on localhost.
+Environment=LLM_WIKI_OLLAMA_URL=http://127.0.0.1:11434/api/chat
+Environment=NIGHTLY_FACTCHECK_SAFE_ROOT=/BIG
+ExecStart=/usr/bin/python3 /BIG/PROJECTS/DSI/DSI-WIKI/CODE/ingest/DSI-Wiki-Nightly-FactCheck.py
