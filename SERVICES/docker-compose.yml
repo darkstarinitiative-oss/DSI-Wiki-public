@@ -38,6 +38,8 @@ services:
       LLM_WIKI_ROUTES: /app/JSONS/DSI-Wiki-Multi-Server-Config.json
       LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
       LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+      LLM_WIKI_OLLAMA_THINK: ${LLM_WIKI_OLLAMA_THINK:-true}
+      LLM_WIKI_OLLAMA_NUM_PREDICT: ${LLM_WIKI_OLLAMA_NUM_PREDICT:-12000}
       WIKI_BASE_DIR: /data/base
       WIKI_LOCK_DIR: /data/lock
       INSTANCES_DIR: /app/JSONS/instances

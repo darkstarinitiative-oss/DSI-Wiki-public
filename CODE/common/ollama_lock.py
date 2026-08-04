@@ -30,7 +30,7 @@ _LOCK_DIR = Path(os.environ.get("WIKI_LOCK_DIR", os.path.expanduser("~/CLEANUP/D
 LOCK_PATH = _LOCK_DIR / ".ollama_gpu.lock"
 STATE_PATH = _LOCK_DIR / ".ollama_gpu_queue.json"
 STATE_LOCK_PATH = _LOCK_DIR / ".ollama_gpu_queue.state.lock"
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
 
 # Max time one caller may hold the VRAM lock once it's running, before it's forcibly
 # evicted (2026-07-30): a stuck/slow holder at the head of the queue would otherwise

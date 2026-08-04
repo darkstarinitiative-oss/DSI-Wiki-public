@@ -76,9 +76,12 @@ ROUTES_RELOAD_INTERVAL = 1800
 _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
 
 # Qwen3-8B (real: qwen3-worker) via local Ollama.
-# thinking defaults to False: benchmarked ~15x faster than thinking=True on this
-# task class with no measurable quality loss (see SUB_DSI-Agent-Profiles_Model-Priority).
-# Note: thinking is only actually suppressed via /api/chat's top-level `think`
+# thinking defaults to True: with think=false, qwen3:4b was observed narrating its
+# reasoning as regular content instead of using Ollama's separate `message.thinking`
+# field, so the delimiter parser below would grab a mid-monologue fragment instead of
+# the real answer. With think=true, Ollama splits `message.thinking` (reasoning) from
+# `message.content` (final answer) — only `content` is used below, so it comes back
+# clean. Note: thinking is only actually toggled via /api/chat's top-level `think`
 # field — /api/generate and prompt-level "/no_think" do NOT work on this model.
 OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://localhost:11434/api/chat")
 # Downsized from qwen3-worker (qwen3:8b, 5.2GB) to qwen3:4b (2.5GB) 2026-07-30: on the
@@ -87,7 +90,7 @@ OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://localhost:11434/api/c
 OLLAMA_MODEL = os.environ.get("LLM_WIKI_OLLAMA_MODEL", "qwen3:4b")
 OLLAMA_NUM_CTX = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_CTX", "16384"))
 OLLAMA_NUM_PREDICT = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_PREDICT", "6000"))
-OLLAMA_THINK = os.environ.get("LLM_WIKI_OLLAMA_THINK", "false").lower() == "true"
+OLLAMA_THINK = os.environ.get("LLM_WIKI_OLLAMA_THINK", "true").lower() == "true"
 
 
 class _LLMResult:
@@ -284,6 +287,12 @@ def write_layers(topic: str, contents: dict[str, str], layers_cfg: dict, base_di
         layer_dir = base_dir / name
         layer_dir.mkdir(parents=True, exist_ok=True)
         path = layer_dir / f"{topic}.md"
+        if name == "minified":
+            # Deterministic, not LLM-authored: the model was asked to append this
+            # line itself and sometimes wrote "--layer minified" instead of "llm"
+            # (self-referential slip). Appending it here guarantees it's always
+            # correct and always present.
+            content = f"{content}\nLLM:DSI-wiki-get {topic} --layer llm"
         if mode == "append":
             ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
             with open(path, "a", encoding="utf-8") as f:
