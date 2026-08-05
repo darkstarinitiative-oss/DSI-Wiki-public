@@ -1,8 +1,8 @@
 # DSI-Wiki — feature status
 
-Full list of what's actually done vs. still open, as of `v0.1.0` + the unreleased commits on
-`development` since. Source of truth is this file + `CHANGELOG.md` (release history) +
-`TESTS/run_full_test_suite.sh` (what's actually verified) — not memory, not a chat transcript.
+Full list of what's actually done vs. still open, as of `v0.2.0` (current `production`).
+Source of truth is this file + `CHANGELOG.md` (release history) + `TESTS/run_full_test_suite.sh`
+(what's actually verified) — not memory, not a chat transcript.
 
 ## Completed
 
@@ -67,7 +67,9 @@ Full list of what's actually done vs. still open, as of `v0.1.0` + the unrelease
   logging that run's result to `INDEP_TEST_RESULTS` (wiki) — a release with no logged passing
   run for its exact commit isn't a verified release, just a tag.
 - `CHANGELOG.md` (Keep a Changelog format), starting at `0.1.0`.
-- First production release: `v0.1.0` tagged on `production`, pushed to GitLab.
+- `v0.1.0` (first production release) and `v0.2.0` (Info API standard, Cloudflare Tunnel,
+  pluggable backend auth, search-excerpt fix) both tagged on `production`, pushed to GitLab +
+  GitHub. `INDEP_TEST_RESULTS` (wiki) has both releases' passing test runs logged.
 - GitHub mirror (`darkstarinitiative-oss/DSI-Wiki`) created and kept in sync with `development`/
   `production`/tags. **Private**, matching `INDEP_GIT_RULES`'s repo-visibility policy (see
   Known Issues below for why this needed a correction mid-session).
@@ -97,22 +99,20 @@ Full list of what's actually done vs. still open, as of `v0.1.0` + the unrelease
   this repackaging pass. See `DOCS/adapters-roadmap.md`.
 - Multi-collaborator git workflow (MR-gated pushes, required reviewers) intentionally undefined
   — `INDEP_GIT_RULES` leaves this to each project once it actually has more than one contributor.
-- The commits since `v0.1.0` (search-excerpt fix, pluggable backend, Cloudflare Tunnel, MAIN_
-  scoped fact-check, this file) are on `development` only — no `v0.1.1`/next release has been cut
-  yet. See "Next development session" below.
+- `Wiki-BASE` layer-file ownership is inconsistent (some files `ozan:ozan`, some `root:root`,
+  depending on whether they were last written by a host-side hand-edit or by the `ingest`
+  container) — not a functional bug (the container can always write; only host-side hand-edits
+  hit `EACCES` on root-owned files) but worth normalizing eventually.
 
 ## Next development session
 
-Pending a fresh `production` release once picked up again:
+No pending release — `v0.2.0` is on `production`, pushed to GitLab + GitHub, test run logged to
+`INDEP_TEST_RESULTS`. Real open work, roughly in priority order:
 
-1. Run `bash TESTS/run_full_test_suite.sh` — confirm 19/19 (or however many exist by then) on
-   current `development` before touching `production`.
-2. Cut the release per `INDEP_GIT_RULES`: merge `development` into `production` (`--no-ff`), tag
-   (likely `v0.1.1` — nothing here is a breaking change or a new user-facing capability large
-   enough for a MINOR bump; PATCH covers a bugfix + two ops/infra additions), push tags to
-   GitLab + GitHub, log the test result to `INDEP_TEST_RESULTS`.
-3. Real open work, roughly in priority order: fix the container `subdomain_routes: {}` gap so
-   the 4 wiki hostnames actually path-scope instead of all hitting the same root; decide whether
-   the sanitized public fork (discussed, not built) is still wanted, and if so scope what
-   "sanitized" means concretely (which files/paths get stripped) before building it; Claude API
-   adapter if a cloud backend without HTTP-compatible wire format becomes worth it.
+1. Fix the container `subdomain_routes: {}` gap so the 4 wiki hostnames actually path-scope
+   instead of all hitting the same root.
+2. Decide whether the sanitized public fork (discussed, not built) is still wanted, and if so
+   scope what "sanitized" means concretely (which files/paths get stripped) before building it.
+3. Claude API adapter, if a cloud backend without an HTTP/Ollama-compatible wire format becomes
+   worth it.
+4. Normalize `Wiki-BASE` file ownership (see Known Issues above).
