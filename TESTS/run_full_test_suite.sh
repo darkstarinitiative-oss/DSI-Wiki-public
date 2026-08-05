@@ -39,6 +39,28 @@ MCP_INIT=$(curl -sS --max-time 10 -X POST http://localhost:8430/mcp/ \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"dsi-test","version":"1.0"}}}')
 run "MCP initialize" "$MCP_INIT" '"serverInfo"'
 
+BACKEND_KEY_TEST=$(REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" python3 -c "
+import sys, os
+sys.path.insert(0, os.path.join(os.environ['REPO_ROOT'], 'CODE'))
+os.environ['LLM_WIKI_OLLAMA_API_KEY'] = 'test-key-not-real'
+import importlib
+import common.ollama_lock as ol
+importlib.reload(ol)
+import urllib.request
+captured = {}
+orig = urllib.request.urlopen
+def fake_urlopen(req, timeout=None):
+    captured['auth'] = req.get_header('Authorization')
+    raise SystemExit(0)  # short-circuit before any real network call
+urllib.request.urlopen = fake_urlopen
+try:
+    ol.call_ollama('m', [{'role': 'user', 'content': 'x'}], timeout=1)
+except SystemExit:
+    pass
+print('OK' if captured.get('auth') == 'Bearer test-key-not-real' else 'MISSING')
+" 2>&1)
+run "Pluggable backend: LLM_WIKI_OLLAMA_API_KEY sends Authorization header" "$BACKEND_KEY_TEST" '^OK$'
+
 run "Health: gateway container running" "$(docker inspect -f '{{.State.Status}}' services-gateway-1 2>&1)" '^running$'
 run "Health: ingest container running" "$(docker inspect -f '{{.State.Status}}' services-ingest-1 2>&1)" '^running$'
 run "Health: ollama reachable" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:11434/api/tags)" '^200$'

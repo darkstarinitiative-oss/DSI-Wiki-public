@@ -128,6 +128,10 @@ _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None,
 # clean. Note: thinking is only actually toggled via /api/chat's top-level `think`
 # field — /api/generate and prompt-level "/no_think" do NOT work on this model.
 OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://localhost:11434/api/chat")
+# Optional bearer auth for any Ollama/OpenAI-wire-compatible endpoint that needs it (Ollama
+# Cloud, a self-hosted router in front of multiple backends -- see DOCS/llm-backend-roadmap.md).
+# Empty (default) = no Authorization header, i.e. today's plain local-Ollama behavior, unchanged.
+OLLAMA_API_KEY = os.environ.get("LLM_WIKI_OLLAMA_API_KEY", "")
 # Downsized from qwen3-worker (qwen3:8b, 5.2GB) to qwen3:4b (2.5GB) 2026-07-30: on the
 # 8GB GTX 1070, the 8B model was already spilling past VRAM into CPU offload on its
 # own, before any other consumer even joined the queue (see common/ollama_lock.py).
@@ -154,10 +158,10 @@ def run_llm(prompt: str, timeout: int) -> _LLMResult:
         "think": OLLAMA_THINK,
         "options": {"num_ctx": OLLAMA_NUM_CTX, "num_predict": OLLAMA_NUM_PREDICT},
     }).encode("utf-8")
-    req = urllib.request.Request(
-        OLLAMA_URL, data=payload,
-        headers={"Content-Type": "application/json"}, method="POST",
-    )
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+    req = urllib.request.Request(OLLAMA_URL, data=payload, headers=headers, method="POST")
     try:
         with gpu_lock(label="wiki-ingest"):
             with urllib.request.urlopen(req, timeout=timeout) as resp:

@@ -31,6 +31,10 @@ LOCK_PATH = _LOCK_DIR / ".ollama_gpu.lock"
 STATE_PATH = _LOCK_DIR / ".ollama_gpu_queue.json"
 STATE_LOCK_PATH = _LOCK_DIR / ".ollama_gpu_queue.state.lock"
 OLLAMA_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
+# Optional: set to point call_ollama() at any Ollama/OpenAI-wire-compatible endpoint that
+# needs bearer auth -- Ollama Cloud, a self-hosted router in front of multiple backends, etc.
+# Empty (default) = no Authorization header, i.e. today's plain local-Ollama behavior, unchanged.
+OLLAMA_API_KEY = os.environ.get("LLM_WIKI_OLLAMA_API_KEY", "")
 
 # Max time one caller may hold the VRAM lock once it's running, before it's forcibly
 # evicted (2026-07-30): a stuck/slow holder at the head of the queue would otherwise
@@ -115,8 +119,12 @@ def gpu_lock(label: str = ""):
 def call_ollama(model: str, messages: list, tools: list | None = None,
                  think: bool = False, timeout: int = 120,
                  options: dict | None = None, url: str = OLLAMA_URL,
-                 label: str = "") -> dict:
-    """Queued POST to Ollama /api/chat. Returns the parsed JSON response body."""
+                 api_key: str = OLLAMA_API_KEY, label: str = "") -> dict:
+    """Queued POST to an Ollama-wire-compatible /api/chat endpoint. Returns the parsed JSON
+    response body. `url`/`api_key` default to LLM_WIKI_OLLAMA_URL/LLM_WIKI_OLLAMA_API_KEY, so
+    swapping backends (Ollama Cloud, a self-hosted router, anything else speaking this same
+    wire format) is a config change, not a code change -- see DOCS/llm-backend-roadmap.md.
+    """
     import urllib.request
 
     payload = {"model": model, "messages": messages, "think": think, "stream": False}
@@ -124,9 +132,11 @@ def call_ollama(model: str, messages: list, tools: list | None = None,
         payload["tools"] = tools
     if options:
         payload["options"] = options
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     req = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}, method="POST",
+        url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST",
     )
     with gpu_lock(label=label or model):
         with urllib.request.urlopen(req, timeout=timeout) as resp:

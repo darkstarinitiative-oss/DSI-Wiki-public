@@ -22,6 +22,7 @@ x-common: &common
   environment:
     LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
     LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+    LLM_WIKI_OLLAMA_API_KEY: ${LLM_WIKI_OLLAMA_API_KEY:-}
     WIKI_BASE_DIR: /data/base
     INSTANCES_DIR: /app/JSONS/instances
     WIKI_STATUS_PATH: /data/status/STATUS.json
@@ -38,6 +39,7 @@ services:
       LLM_WIKI_ROUTES: /app/JSONS/DSI-Wiki-Multi-Server-Config.json
       LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
       LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+      LLM_WIKI_OLLAMA_API_KEY: ${LLM_WIKI_OLLAMA_API_KEY:-}
       LLM_WIKI_OLLAMA_THINK: ${LLM_WIKI_OLLAMA_THINK:-true}
       LLM_WIKI_OLLAMA_NUM_PREDICT: ${LLM_WIKI_OLLAMA_NUM_PREDICT:-12000}
       WIKI_BASE_DIR: /data/base
@@ -62,6 +64,7 @@ services:
       # dropping a file into raw/ would use), so gateway needs it read-write too.
       LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
       LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+      LLM_WIKI_OLLAMA_API_KEY: ${LLM_WIKI_OLLAMA_API_KEY:-}
       LLM_WIKI_RAW_DIR: /data/raw
       WIKI_BASE_DIR: /data/base
       INSTANCES_DIR: /app/JSONS/instances
