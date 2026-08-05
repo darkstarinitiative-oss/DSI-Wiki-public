@@ -70,11 +70,15 @@ def _instance_base_dir(request, scan_dir):
     return instances[name]["base_dir"], instances
 
 
-async def status_endpoint(request):
-    status_path = os.environ.get(
+def _status_path():
+    return os.environ.get(
         "WIKI_STATUS_PATH",
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "STATUS.json"),
     )
+
+
+async def status_endpoint(request):
+    status_path = _status_path()
     if not os.path.isfile(status_path):
         return JSONResponse({"error": "STATUS.json not yet written (ingest daemon not running?)"}, status_code=503)
     try:
@@ -82,6 +86,39 @@ async def status_endpoint(request):
             return JSONResponse(json.load(f))
     except (OSError, json.JSONDecodeError) as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def info_endpoint(request):
+    """DSI Info API Standard (DOCS/info-api-standard.md) -- a passthrough adapter over the
+    ingest daemon's STATUS.json, plus this Gateway's own live-computed services[] entry
+    (it has no poll loop of its own, so it's "ok" with a null heartbeat whenever it's
+    answering a request at all)."""
+    status_path = _status_path()
+    ingest_status, ingest_note, services, feed = "error", "STATUS.json not yet written (ingest daemon not running?)", [], []
+    service_name, version = "dsi-wiki", "0.1a"
+    if os.path.isfile(status_path):
+        try:
+            with open(status_path, encoding="utf-8") as f:
+                raw = json.load(f)
+            ingest_status = raw.get("status", "error")
+            ingest_note = raw.get("status_note", "")
+            services = raw.get("services", [])
+            feed = raw.get("feed", [])
+            version = raw.get("version", version)
+        except (OSError, json.JSONDecodeError) as e:
+            ingest_status, ingest_note = "error", str(e)
+
+    services = list(services) + [
+        {"name": "DSI-Wiki Gateway", "status": "ok", "last_heartbeat": None},
+    ]
+    return JSONResponse({
+        "service": service_name,
+        "version": version,
+        "status": ingest_status,
+        "status_note": ingest_note,
+        "services": services,
+        "feed": feed,
+    })
 
 
 async def instances_endpoint(request):
@@ -129,6 +166,7 @@ def build_app(scan_dir):
         Route("/wiki", wiki_endpoint),
         Route("/search", search_endpoint),
         Route("/status", status_endpoint),
+        Route("/info", info_endpoint),
     ])
     app.state.scan_dir = scan_dir
     return app

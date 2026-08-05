@@ -45,10 +45,47 @@ def _git_commit() -> str | None:
 # can show "last ingest" without waiting for the next poll-cycle snapshot.
 _last_ingest = {"topic": None, "finished_at": None, "duration_seconds": None, "ok": None}
 
+# DSI Info API Standard (DOCS/info-api-standard.md): last _FEED_MAX events, newest
+# first. What counts as feed-worthy is this project's own call, per the standard --
+# here that's every ingest outcome, one entry each.
+_FEED_MAX = 10
+_feed: list = []
+
+
+def _push_feed(icon: str, title: str, note: str = ""):
+    _feed.insert(0, {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "icon": icon,
+        "title": title,
+        "note": note,
+    })
+    del _feed[_FEED_MAX:]
+
 
 def write_status(instances_loaded: int):
+    # DSI Info API Standard fields (service/version/status/status_note/services/feed)
+    # alongside the pre-existing ones (kept for anything already reading them).
+    ok = _last_ingest.get("ok")
+    if ok is False:
+        info_status, info_note = "warning", f"last ingest ({_last_ingest.get('topic')}) failed — see feed"
+    else:
+        info_status, info_note = "ok", "nominal"
+
     status = {
         "service": "dsi-wiki-ingest",
+        "version": SERVICE_VERSION,
+        "status": info_status,
+        "status_note": info_note,
+        "services": [
+            {
+                "name": "DSI-Wiki Ingest Daemon",
+                "status": info_status,
+                "last_heartbeat": datetime.now(timezone.utc).isoformat(),
+            },
+        ],
+        "feed": _feed,
+        # Pre-existing fields, kept for backward compatibility with anything already
+        # reading /api/status.
         "last_poll_ts": datetime.now(timezone.utc).isoformat(),
         "instances_loaded": instances_loaded,
         "ollama_model": OLLAMA_MODEL,
@@ -379,11 +416,17 @@ def regenerate_consolidated_layers(main_topic: str, base_dir: Path, layers_cfg: 
     log(f"   >> consolidated {list(parsed.keys())} written for: {main_topic} (from {len(sources)} source page(s))")
 
 
-def _record_ingest_result(topic: str, started_at: float, ok: bool):
+def _record_ingest_result(topic: str, started_at: float, ok: bool, note: str = ""):
+    duration = round(time.time() - started_at, 1)
     _last_ingest["topic"] = topic
     _last_ingest["finished_at"] = datetime.now(timezone.utc).isoformat()
-    _last_ingest["duration_seconds"] = round(time.time() - started_at, 1)
+    _last_ingest["duration_seconds"] = duration
     _last_ingest["ok"] = ok
+    _push_feed(
+        icon="ok" if ok else "warning",
+        title=f"{topic}: {'ingested' if ok else 'failed'}",
+        note=note or f"{duration}s",
+    )
 
 
 def process_file(raw_path: Path):
@@ -415,28 +458,28 @@ def process_file(raw_path: Path):
         result = run_llm(prompt, timeout=CLAUDE_TIMEOUT)
     except TimeoutError:
         log(f"   !! Timed out after {CLAUDE_TIMEOUT}s — skipping.")
-        _record_ingest_result(topic, started_at, ok=False)
+        _record_ingest_result(topic, started_at, ok=False, note=f"timed out after {CLAUDE_TIMEOUT}s")
         return
     except ConnectionError as e:
         log(f"   !! {e}")
-        _record_ingest_result(topic, started_at, ok=False)
+        _record_ingest_result(topic, started_at, ok=False, note=str(e)[:200])
         return
 
     if result.returncode != 0:
         log(f"   !! bonsai error: {result.stderr[:300]}")
-        _record_ingest_result(topic, started_at, ok=False)
+        _record_ingest_result(topic, started_at, ok=False, note=f"bonsai error: {result.stderr[:150]}")
         return
 
     parsed = parse_output(result.stdout, layer_names)
     if parsed is None:
         log("   !! Delimiter markers missing in bonsai output.")
         log(f"      First 400 chars: {result.stdout[:400]}")
-        _record_ingest_result(topic, started_at, ok=False)
+        _record_ingest_result(topic, started_at, ok=False, note="delimiter markers missing in model output")
         return
 
     write_layers(topic, parsed, file_layers_cfg, base_dir)
     log(f"   >> {len(parsed)} layers written for: {topic} (base_dir={base_dir}, layers={list(parsed.keys())})")
-    _record_ingest_result(topic, started_at, ok=True)
+    _record_ingest_result(topic, started_at, ok=True, note=f"{len(parsed)} layer(s) written")
 
     if consolidate:
         regenerate_consolidated_layers(main_topic, base_dir, layers_cfg, route_rules)

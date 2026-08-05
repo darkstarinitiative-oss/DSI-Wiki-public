@@ -274,6 +274,91 @@ fetchInstances();
 """
 
 
+INFO_VIEWER_HTML = f"""<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSI Info API — viewer</title>
+<link rel="stylesheet" href="{THEME_URL}">
+<style>
+  body {{ padding: 2rem; }}
+  .badge-ok {{ background: var(--bs-success); }}
+  .badge-warning {{ background: var(--bs-warning); color: #000; }}
+  .badge-error {{ background: var(--bs-danger); }}
+  .badge-info, .badge-unknown {{ background: var(--bs-secondary); }}
+  .feed-item {{ border-left: 3px solid var(--bs-border-color); padding-left: 0.75rem; margin-bottom: 0.75rem; }}
+</style>
+</head>
+<body>
+<div class="container" style="max-width: 800px;">
+  <h3>DSI Info API — generic viewer <small class="text-secondary fs-6">(conformance test page)</small></h3>
+  <p class="text-secondary" style="font-size:0.85rem;">
+    Points at any URL implementing the DSI Info API Standard (see this repo's
+    <code>DOCS/info-api-standard.md</code>) and renders it generically -- not specific to this
+    project. The target must allow this page to fetch it (same-origin, or CORS-enabled).
+  </p>
+  <form id="url-form" class="d-flex gap-2 mb-4">
+    <input id="url-input" class="form-control form-control-sm" placeholder="http://host:port/api/info" value="/api/info">
+    <button type="submit" class="btn btn-primary btn-sm">Fetch</button>
+  </form>
+  <div id="error" class="alert alert-danger py-1 px-2" style="display:none;"></div>
+  <div id="result" style="display:none;">
+    <h5><span id="r-service"></span> <small class="text-secondary" id="r-version"></small> <span id="r-status" class="badge"></span></h5>
+    <p id="r-note" class="text-secondary"></p>
+    <h6 class="mt-3">Services</h6>
+    <div id="r-services" class="mb-3"></div>
+    <h6>Feed</h6>
+    <div id="r-feed"></div>
+  </div>
+</div>
+<script>
+function badge(status) {{
+  return `<span class="badge badge-${{status || 'unknown'}}">${{status || 'unknown'}}</span>`;
+}}
+function timeAgo(iso) {{
+  if (!iso) return 'never';
+  const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.round(secs / 60) + 'm ago';
+  return Math.round(secs / 3600) + 'h ago';
+}}
+function render(data) {{
+  document.getElementById('r-service').textContent = data.service || '(unnamed service)';
+  document.getElementById('r-version').textContent = data.version || '';
+  const statusEl = document.getElementById('r-status');
+  statusEl.className = 'badge badge-' + (data.status || 'unknown');
+  statusEl.textContent = data.status || 'unknown';
+  document.getElementById('r-note').textContent = data.status_note || '';
+  document.getElementById('r-services').innerHTML = (data.services || []).map(s =>
+    `<div>${{badge(s.status)}} <strong>${{s.name}}</strong> <span class="text-secondary">-- heartbeat: ${{timeAgo(s.last_heartbeat)}}</span></div>`
+  ).join('') || '<div class="text-secondary">none reported</div>';
+  document.getElementById('r-feed').innerHTML = (data.feed || []).slice(0, 10).map(f =>
+    `<div class="feed-item">${{badge(f.icon)}} <strong>${{f.title}}</strong> <span class="text-secondary">${{timeAgo(f.ts)}}</span><br><span class="text-secondary">${{f.note || ''}}</span></div>`
+  ).join('') || '<div class="text-secondary">empty</div>';
+  document.getElementById('result').style.display = 'block';
+}}
+document.getElementById('url-form').addEventListener('submit', e => {{
+  e.preventDefault();
+  const url = document.getElementById('url-input').value.trim();
+  const errEl = document.getElementById('error');
+  errEl.style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  fetch(url).then(r => {{
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }}).then(render).catch(e => {{
+    errEl.textContent = 'Fetch failed: ' + e.message + ' (CORS, wrong URL, or target unreachable)';
+    errEl.style.display = 'block';
+  }});
+}});
+document.getElementById('url-form').dispatchEvent(new Event('submit'));
+</script>
+</body>
+</html>
+"""
+
+
 DASHBOARD_HTML = f"""<!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
 <head>
@@ -445,6 +530,10 @@ async def dashboard(request):
     return HTMLResponse(DASHBOARD_HTML)
 
 
+async def info_viewer(request):
+    return HTMLResponse(INFO_VIEWER_HTML)
+
+
 async def api_instances(request):
     instances = load_instances(request.app.state.scan_dir)
     return JSONResponse({"instances": sorted(instances.keys()), "default": _default_instance(instances)})
@@ -565,6 +654,7 @@ def build_app(scan_dir):
     app = Starlette(routes=[
         Route("/", index),
         Route("/dashboard", dashboard),
+        Route("/info-viewer", info_viewer),
         Route("/api/instances", api_instances),
         Route("/api/topics", api_topics),
         Route("/api/all_topics", api_all_topics),
