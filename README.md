@@ -56,6 +56,36 @@ Manual equivalent:
    optional `keyword` / `tag`, `enabled: true`.
 3. `python3 TOOLS/DSI-Wiki-Service-Supervisor.py`
 
+## LLM backend
+
+Default is local Ollama — set in `SERVICES/.env` (Docker) or `CODE/ingest/.env` (native):
+
+```
+LLM_WIKI_OLLAMA_URL=http://host.docker.internal:11434/api/chat   # native: http://127.0.0.1:11434/api/chat
+LLM_WIKI_OLLAMA_MODEL=qwen3:4b
+```
+
+`qwen3:4b` needs real VRAM headroom — this project was developed on an 8GB GPU where that model
+alone already runs it close to the limit (see `common/ollama_lock.py`'s docstring on the
+cross-process queue that became necessary once anything else contended for the same card). If
+your GPU has less than ~8GB, or you're CPU-only, either use a smaller/quantized model
+(`LLM_WIKI_OLLAMA_MODEL`) or skip local Ollama entirely and use one of the options below.
+
+**Ollama Cloud / Hugging Face / a self-hosted router** — anything speaking the same
+`/api/chat`-shaped wire format: point `LLM_WIKI_OLLAMA_URL` at it, and set an optional
+`LLM_WIKI_OLLAMA_API_KEY` if it needs bearer auth (`Authorization: Bearer <key>`, sent only when
+this is non-empty). No code change either way.
+
+**Claude Code CLI** — a different integration entirely (shells out to `claude -p`, not an HTTP
+call): set `LLM_WIKI_BACKEND=claude-code`. Requires the `claude` CLI on PATH and authenticated
+wherever the ingest daemon actually runs — **not currently available inside the Docker `ingest`
+container** (the image doesn't have it installed), only for a native/non-Docker deployment or a
+host where you've added it to the image yourself. Real per-call API cost; opt-in only, never the
+default.
+
+See [`DOCS/llm-backend-roadmap.md`](DOCS/llm-backend-roadmap.md) for what's still not supported
+(a direct Claude API adapter, OpenCode, Aider, per-layer backend routing).
+
 ## Project layout
 
 ```
