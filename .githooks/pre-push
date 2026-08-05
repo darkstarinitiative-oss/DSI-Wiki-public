@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Runs TESTS/run_full_test_suite.sh before every push and WARNS loudly if it fails or can't
+# run -- never blocks. Enabled by `git config core.hooksPath .githooks` (see README.md /
+# INDEP_GIT_RULES) -- not automatic on a fresh clone until that's set once.
+#
+# Deliberately warn-only, not a hard gate: nobody should get stuck unable to push because a
+# hook decided so on their behalf -- the point is "you get told the test result isn't current
+# for this push," not "the push doesn't happen." Push still goes through in every case below.
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SUITE="$REPO_ROOT/TESTS/run_full_test_suite.sh"
+
+if [ ! -x "$SUITE" ]; then
+  echo "pre-push: WARNING -- $SUITE not found, no current test result for this push." >&2
+  exit 0
+fi
+
+if ! curl -sS -o /dev/null --max-time 3 http://localhost:8430/api/instances 2>/dev/null; then
+  echo "pre-push: WARNING -- gateway not reachable on localhost:8430, skipping the test run." >&2
+  echo "          No current test result for this push -- run TESTS/run_full_test_suite.sh" >&2
+  echo "          by hand somewhere the stack is reachable if you want one." >&2
+  exit 0
+fi
+
+echo "pre-push: running TESTS/run_full_test_suite.sh..." >&2
+if bash "$SUITE"; then
+  echo "pre-push: all tests passed." >&2
+else
+  echo "pre-push: WARNING -- TEST SUITE FAILED. Pushing anyway (this hook never blocks) --" >&2
+  echo "          but you're pushing a commit with a known-failing test result. Fix it when" >&2
+  echo "          you can, and don't tag a production release off this commit until it's" >&2
+  echo "          green (see INDEP_GIT_RULES)." >&2
+fi
+exit 0

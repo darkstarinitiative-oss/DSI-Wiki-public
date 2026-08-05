@@ -19,10 +19,16 @@ rules: [`DOCS/naming-conventions.md`](DOCS/naming-conventions.md). Prerequisites
 git clone <repo> && cd DSI-Wiki
 cp SERVICES/.env.example SERVICES/.env   # fill in host paths + Ollama URL/model
 docker compose -f SERVICES/docker-compose.yml up -d
+git config core.hooksPath .githooks      # enable the pre-push test-result warning (see below)
 ```
 
 See [`SERVICES/DEPLOY.md`](SERVICES/DEPLOY.md) for the full step-by-step (Docker install check,
 verification, seeding the first note).
+
+`git config core.hooksPath .githooks` is optional but recommended once per clone: it makes
+`git push` run `TESTS/run_full_test_suite.sh` first and print a warning if it fails or can't run
+(unreachable stack, etc.) — never blocks the push, just keeps test-result freshness visible. See
+`INDEP_GIT_RULES` for the full policy (production tags still require an actual passing run).
 
 **Non-Docker / systemd (fallback):**
 
