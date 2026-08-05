@@ -46,18 +46,39 @@ Source of truth is this file + `CHANGELOG.md` (release history) + `TESTS/run_ful
 - `LLM_WIKI_CLAUDE_TIMEOUT` raised 300s -> 600s (covers `think:true`'s combined
   thinking+content generation time for larger notes).
 
-**Pluggable LLM backend (HTTP side)**
-- `common/ollama_lock.py`'s `call_ollama()` and the ingest daemon's `run_llm()` both read an
-  optional `LLM_WIKI_OLLAMA_API_KEY` and send `Authorization: Bearer <key>` when set — so Ollama
-  Cloud, a Hugging Face OpenAI-compatible endpoint, or a self-hosted router in front of multiple
-  backends is a `.env` change, not a code change. See `DOCS/llm-backend-roadmap.md`.
-- Covered by an automated test (`TESTS/run_full_test_suite.sh`'s "Pluggable backend" check —
-  verifies the header actually gets sent when the key is set).
+**Pluggable LLM backend**
+- HTTP side: `common/ollama_lock.py`'s `call_ollama()` and the ingest daemon's `run_llm()` both
+  read an optional `LLM_WIKI_OLLAMA_API_KEY` and send `Authorization: Bearer <key>` when set —
+  so Ollama Cloud, a Hugging Face OpenAI-compatible endpoint, or a self-hosted router in front of
+  multiple backends is a `.env` change, not a code change.
+- CLI-agent side: `LLM_WIKI_BACKEND=claude-code` shells out to the `claude` CLI
+  (`CODE/common/claude_code_backend.py`) instead of an HTTP call. Real per-call API cost, opt-in
+  only. Works wherever `run_llm()` actually executes and has `claude` on PATH + authenticated —
+  **not** inside the Docker `ingest` container today (no `claude` CLI in that image).
+- See `DOCS/llm-backend-roadmap.md` for what's still not covered (Claude API adapter,
+  OpenCode/Aider, per-layer backend routing).
+- Covered by two automated tests (`TESTS/run_full_test_suite.sh`): the API-key header check, and
+  a real `claude-code` round-trip (skipped automatically if `claude` isn't on PATH).
+
+**Container runs as a non-root user**
+- The Docker image (`SERVICES/Dockerfile`) now creates and runs as a non-root user matching the
+  host user's UID:GID (`APP_UID`/`APP_GID` build args, default `1000:1000`, overridable in
+  `.env`) — files written into bind-mounted host directories (`Wiki-RAW`/`ARCHIVE`/`BASE`, the
+  GPU lock dir) come out host-user-owned, not root. Fixes the ownership inconsistency noted
+  after `v0.2.0` (some files were `root:root` from before this change; one-time
+  `chown -R $APP_UID:$APP_GID` needed on any pre-existing data directories/named volumes when
+  upgrading an existing deployment — not needed for a fresh install).
+
+**Sanitization hygiene**
+- `SERVICES/cloudflared-install.sh` no longer hardcodes real Cloudflare account/tunnel IDs or
+  the domain — all read from `~/.env` (`CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_TUNNEL_ID`/
+  `CLOUDFLARE_DNS_ZONE`) at runtime, matching `INDEP_GIT_RULES`'s secrets policy.
 
 **Testing / release process**
-- `TESTS/run_full_test_suite.sh` — 19 automated checks: every `/api/*` endpoint, both `/http/*`
-  UI pages, all CLI proxies, an MCP round-trip, the pluggable-backend header check, and 5 live
-  health checks (containers, Ollama, cloudflared, fact-check timer). Exit 0 iff everything passes.
+- `TESTS/run_full_test_suite.sh` — up to 21 automated checks depending on environment: every
+  `/api/*` endpoint, both `/http/*` UI pages, all CLI proxies, an MCP round-trip, both
+  pluggable-backend checks, and 5 live health checks (containers, Ollama, cloudflared,
+  fact-check timer). Exit 0 iff everything passes.
 - Bug this suite caught and fixed on its first real run: `search()`'s excerpt was always the
   first 1500 chars of a file regardless of where the match actually was, so long-document hits
   could show a preview that never contained the matched term. Fixed in both `api_app.py`'s
@@ -84,35 +105,35 @@ Source of truth is this file + `CHANGELOG.md` (release history) + `TESTS/run_ful
   (`JSONS/DSI-Wiki-HTTP-Config.json`) already has host->mount rules
   (`wiki-api -> /api`, `wiki-mcp -> /mcp`, `wiki-http`/`wiki -> /http`) via
   `SubdomainDispatchMiddleware`, but the **container** config
-  (`SERVICES/DSI-Wiki-HTTP-Config.container.json`) has an empty `subdomain_routes: {}` — noticed
-  during this session's work, not yet fixed.
+  (`SERVICES/DSI-Wiki-HTTP-Config.container.json`) has an empty `subdomain_routes: {}`.
+  Explicit decision (2026-08-05): **deferred, not urgent** — all 4 hostnames currently serve the
+  full app, so nothing is broken, just not narrowed.
 - No per-instance/per-layer backend *routing* (e.g. `documentation` on a stronger cloud model
   while `minified`/`llm` stay local) — only single-backend swapping via `.env`.
-- Claude API backend not implemented — Anthropic's request/response shape differs enough
-  (message structure, `x-api-key` header, no `message.content` field) that it needs real adapter
-  code, not just the URL/key config swap that covers Ollama Cloud/HuggingFace/a router.
-- CLI-agent backends (Claude Code, OpenCode, Aider) not implemented — different integration
-  shape entirely (subprocess + prompt/task, not an HTTP chat call). See
-  `DOCS/llm-backend-roadmap.md`.
+- Claude API backend (direct Anthropic Messages API, as opposed to the Claude Code CLI backend,
+  which *is* implemented) not implemented — Anthropic's HTTP request/response shape differs
+  enough (message structure, `x-api-key` header, no `message.content` field) that it needs real
+  adapter code, not just the URL/key config swap that covers Ollama Cloud/HuggingFace/a router.
+  Low priority now that Claude Code CLI covers the same underlying model via a different path.
+- OpenCode, Aider backends not implemented — same CLI-agent shape as Claude Code (now
+  implemented), just not built for these two yet. See `DOCS/llm-backend-roadmap.md`.
 - AI-chat-to-raw-note adapter (turning a coding-session transcript into a `raw/<topic>.md` note
   automatically) not implemented — scoped as a future Claude Code plugin/extension, not part of
   this repackaging pass. See `DOCS/adapters-roadmap.md`.
 - Multi-collaborator git workflow (MR-gated pushes, required reviewers) intentionally undefined
   — `INDEP_GIT_RULES` leaves this to each project once it actually has more than one contributor.
-- `Wiki-BASE` layer-file ownership is inconsistent (some files `ozan:ozan`, some `root:root`,
-  depending on whether they were last written by a host-side hand-edit or by the `ingest`
-  container) — not a functional bug (the container can always write; only host-side hand-edits
-  hit `EACCES` on root-owned files) but worth normalizing eventually.
+- Sanitized public fork still not built — only the policy (`INDEP_GIT_RULES`) and a first
+  cleanup pass (`cloudflared-install.sh`, above) exist. `SERVICES/DEPLOY.md` and
+  `DOCS/GTX1070-Deployment-Plan.md` still contain this real deployment's hostname/LAN IP — that's
+  correct for the private repo (it's a real deployment record) but would need a generic rewrite
+  for a public fork.
 
 ## Next development session
 
 No pending release — `v0.2.0` is on `production`, pushed to GitLab + GitHub, test run logged to
 `INDEP_TEST_RESULTS`. Real open work, roughly in priority order:
 
-1. Fix the container `subdomain_routes: {}` gap so the 4 wiki hostnames actually path-scope
-   instead of all hitting the same root.
-2. Decide whether the sanitized public fork (discussed, not built) is still wanted, and if so
-   scope what "sanitized" means concretely (which files/paths get stripped) before building it.
-3. Claude API adapter, if a cloud backend without an HTTP/Ollama-compatible wire format becomes
-   worth it.
-4. Normalize `Wiki-BASE` file ownership (see Known Issues above).
+1. Sanitized public fork, if still wanted — scope concretely which files need a generic rewrite
+   (`DEPLOY.md`/`GTX1070-Deployment-Plan.md` real host/IP identified above) vs. which stay as-is.
+2. Container `subdomain_routes: {}` path-scoping (deferred, see Known Issues).
+3. OpenCode/Aider backends, or a direct Claude API adapter, if either becomes worth it.

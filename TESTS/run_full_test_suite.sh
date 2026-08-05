@@ -61,6 +61,22 @@ print('OK' if captured.get('auth') == 'Bearer test-key-not-real' else 'MISSING')
 " 2>&1)
 run "Pluggable backend: LLM_WIKI_OLLAMA_API_KEY sends Authorization header" "$BACKEND_KEY_TEST" '^OK$'
 
+if command -v claude >/dev/null 2>&1; then
+  CLAUDE_CODE_TEST=$(REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" python3 -c "
+import sys, os
+sys.path.insert(0, os.path.join(os.environ['REPO_ROOT'], 'CODE'))
+from common.claude_code_backend import call_claude_code
+try:
+    r = call_claude_code('Reply with exactly: OK', timeout=60)
+    print('OK' if r.get('message', {}).get('content', '').strip() == 'OK' else f'MISMATCH: {r}')
+except Exception as e:
+    print(f'EXCEPTION: {e}')
+" 2>&1)
+  run "Backend: claude-code CLI round-trip (real API call, small cost)" "$CLAUDE_CODE_TEST" '^OK$'
+else
+  echo "| Backend: claude-code CLI round-trip | SKIP (claude CLI not on PATH) |"
+fi
+
 run "Health: gateway container running" "$(docker inspect -f '{{.State.Status}}' services-gateway-1 2>&1)" '^running$'
 run "Health: ingest container running" "$(docker inspect -f '{{.State.Status}}' services-ingest-1 2>&1)" '^running$'
 run "Health: ollama reachable" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:11434/api/tags)" '^200$'

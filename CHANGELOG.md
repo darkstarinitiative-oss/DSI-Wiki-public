@@ -7,6 +7,26 @@ this repo follows).
 
 This file starts at `0.1.0` — earlier history predates the changelog and isn't reconstructed here.
 
+## [Unreleased]
+
+### Added
+- Claude Code CLI as a second, opt-in LLM backend (`LLM_WIKI_BACKEND=claude-code`,
+  `CODE/common/claude_code_backend.py`) — shells out to `claude -p ... --output-format json`.
+  Real per-call API cost; not usable inside the Docker `ingest` container yet (no `claude` CLI
+  in that image). Covered by a real round-trip test in `TESTS/run_full_test_suite.sh` (skipped
+  if `claude` isn't on PATH).
+- Docker image now runs as a non-root user matching the host UID:GID (`APP_UID`/`APP_GID` build
+  args, default `1000:1000`) instead of root, so files written into bind-mounted host
+  directories come out host-user-owned.
+
+### Fixed
+- `SERVICES/cloudflared-install.sh` no longer hardcodes real Cloudflare account/tunnel IDs or
+  domain — reads `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_TUNNEL_ID`/`CLOUDFLARE_DNS_ZONE` from
+  `~/.env` at runtime.
+- Pre-existing `Wiki-BASE`/lock-dir files left `root:root` by earlier root-run containers,
+  blocking the new non-root container from writing — one-time `chown -R` needed on upgrade
+  (not needed for a fresh install).
+
 ## [0.2.0] - 2026-08-05
 
 ### Added

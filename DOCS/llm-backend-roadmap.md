@@ -6,9 +6,15 @@
 at Ollama Cloud, a Hugging Face OpenAI-compatible endpoint, or a self-hosted router in front of
 multiple backends is a `.env` change (`LLM_WIKI_OLLAMA_URL` + `LLM_WIKI_OLLAMA_MODEL` +
 `LLM_WIKI_OLLAMA_API_KEY`), not a code change. Covered by
-`TESTS/run_full_test_suite.sh`'s "Pluggable backend" check. The CLI-agent backends (Claude
-Code/OpenCode/Aider) below are **not** implemented — they need a fundamentally different
-integration shape (subprocess, not HTTP chat) and remain a real roadmap item, not a completed one.
+`TESTS/run_full_test_suite.sh`'s "Pluggable backend" check. **Claude Code is also implemented**
+(2026-08-05) as a second, opt-in backend (`LLM_WIKI_BACKEND=claude-code`) — a different
+integration shape (subprocess, not HTTP chat), see `CODE/common/claude_code_backend.py`, but not
+a fundamentally harder one: `claude -p <prompt> --output-format json` returns a single JSON
+result, shelled out to and parsed the same way `run_llm()` already mirrors a
+`subprocess.CompletedProcess` interface for its Ollama path. Real per-call API cost — opt-in,
+never the default. **Not** currently usable from the Docker `ingest` container (the image has no
+`claude` CLI or its auth), only wherever `run_llm()` executes on a host that has it. OpenCode and
+Aider remain unimplemented.
 
 ## Why
 
@@ -39,13 +45,14 @@ Candidate/supported backends, roughly in order of how little new infra they need
   `Authorization: Bearer`, no `message.content` field) that it needs real adapter code, not just
   a URL/key change. Natural fit for `documentation`/`brief` where quality matters most and volume
   is lowest, if/when that adapter gets written.
-- **Claude Code**, **OpenCode**, **Aider** — these are CLI coding agents, not bare chat
-  endpoints: driving them means shelling out to a subprocess with a prompt/task and parsing
-  whatever it prints, not a `call_ollama()`-shaped HTTP call. Worth it specifically if ingest
-  ever needs actual tool-use (reading files, running verification commands) rather than today's
-  single prompt-in/text-out call — e.g. the nightly fact-check's own read-only toolset
-  (`CODE/ingest/DSI-Wiki-Nightly-FactCheck.py`) is a hand-rolled version of exactly this pattern,
-  and one of these could plausibly replace it instead of hand-rolling more tool loops per job.
+- **Claude Code** — supported now (`LLM_WIKI_BACKEND=claude-code`), for hosts where the `claude`
+  CLI is on PATH and authenticated. Real API cost per call.
+- **OpenCode**, **Aider** — same CLI-coding-agent shape as Claude Code, not implemented yet. Also
+  worth considering for actual tool-use (reading files, running verification commands) rather
+  than today's single prompt-in/text-out call — e.g. the nightly fact-check's own read-only
+  toolset (`CODE/ingest/DSI-Wiki-Nightly-FactCheck.py`) is a hand-rolled version of exactly this
+  pattern, and one of these could plausibly replace it instead of hand-rolling more tool loops
+  per job.
 
 Router/multi-backend ownership (picking, standing up, and operating whatever fronts these
 endpoints) is out of scope for DSI-Wiki itself — its side of the contract is just "one

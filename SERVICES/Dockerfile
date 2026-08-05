@@ -23,6 +23,17 @@ COPY SERVICES/DSI-Wiki-HTTP-Config.container.json JSONS/DSI-Wiki-HTTP-Config.jso
 COPY SERVICES/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Run as a non-root user matching the host user's UID/GID (default 1000:1000) instead of root,
+# so anything written into a bind-mounted host directory (Wiki-RAW/ARCHIVE/BASE, the status
+# volume) comes out owned by that host user, not root -- override at build time
+# (--build-arg APP_UID=... APP_GID=...) if your host user isn't 1000:1000.
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN (getent group "${APP_GID}" || groupadd -g "${APP_GID}" appuser) && \
+    (getent passwd "${APP_UID}" || useradd -u "${APP_UID}" -g "${APP_GID}" -M -s /usr/sbin/nologin appuser) && \
+    mkdir -p /data/status && chown -R "${APP_UID}:${APP_GID}" /app /data
+USER ${APP_UID}:${APP_GID}
+
 EXPOSE 8430
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["python3", "CODE/gateway/DSI-Wiki-HTTP-Server.py"]

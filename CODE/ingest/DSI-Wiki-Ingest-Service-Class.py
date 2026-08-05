@@ -23,6 +23,7 @@ if _scripts_root not in sys.path:
     sys.path.insert(0, _scripts_root)
 
 from common.ollama_lock import gpu_lock
+from common.claude_code_backend import ClaudeCodeUnavailable, call_claude_code
 
 SERVICE_VERSION = "0.1a"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -139,6 +140,9 @@ OLLAMA_MODEL = os.environ.get("LLM_WIKI_OLLAMA_MODEL", "qwen3:4b")
 OLLAMA_NUM_CTX = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_CTX", "16384"))
 OLLAMA_NUM_PREDICT = int(os.environ.get("LLM_WIKI_OLLAMA_NUM_PREDICT", "6000"))
 OLLAMA_THINK = os.environ.get("LLM_WIKI_OLLAMA_THINK", "true").lower() == "true"
+# "ollama" (default, unchanged) or "claude-code" -- shells out to the `claude` CLI instead of
+# an HTTP call. Real per-call API cost; opt in deliberately, don't flip this as a default.
+LLM_BACKEND = os.environ.get("LLM_WIKI_BACKEND", "ollama").lower()
 
 
 class _LLMResult:
@@ -149,8 +153,20 @@ class _LLMResult:
 
 
 def run_llm(prompt: str, timeout: int) -> _LLMResult:
-    """Calls Qwen3-8B via Ollama's /api/chat. Mirrors the subprocess.CompletedProcess
-    interface (.returncode/.stdout/.stderr) the call sites already expect."""
+    """Calls the configured LLM backend (Ollama by default, or the Claude Code CLI if
+    LLM_WIKI_BACKEND=claude-code). Mirrors the subprocess.CompletedProcess interface
+    (.returncode/.stdout/.stderr) the call sites already expect."""
+    if LLM_BACKEND == "claude-code":
+        try:
+            body = call_claude_code(prompt, timeout=timeout)
+        except ClaudeCodeUnavailable as e:
+            return _LLMResult(1, "", str(e))
+        except TimeoutError:
+            raise
+        if "error" in body:
+            return _LLMResult(1, "", str(body["error"]))
+        return _LLMResult(0, body.get("message", {}).get("content", ""), "")
+
     payload = json.dumps({
         "model": OLLAMA_MODEL,
         "messages": [{"role": "user", "content": prompt}],

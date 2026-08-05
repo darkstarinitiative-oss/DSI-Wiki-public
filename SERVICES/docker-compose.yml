@@ -15,6 +15,12 @@ x-common: &common
   build:
     context: ..
     dockerfile: SERVICES/Dockerfile
+    args:
+      # Match the host user that owns WIKI_RAW_DIR/ARCHIVE/BASE (`id -u`/`id -g`) so files the
+      # container writes into those bind mounts come out host-user-owned, not root. Defaults to
+      # 1000:1000 (the common single-user-Linux-host case); set in .env if that doesn't match.
+      APP_UID: ${APP_UID:-1000}
+      APP_GID: ${APP_GID:-1000}
   image: dsi-wiki:latest
   restart: unless-stopped
   extra_hosts:
@@ -23,6 +29,11 @@ x-common: &common
     LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
     LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
     LLM_WIKI_OLLAMA_API_KEY: ${LLM_WIKI_OLLAMA_API_KEY:-}
+    # "ollama" (default) or "claude-code" -- NOTE: claude-code only works if this image ever
+    # gains the `claude` CLI + its own auth; today's image doesn't, so this stays "ollama" in
+    # the Docker path. It's real right now only for host-native execution (see
+    # DOCS/llm-backend-roadmap.md) -- passed through here for when/if that changes.
+    LLM_WIKI_BACKEND: ${LLM_WIKI_BACKEND:-ollama}
     WIKI_BASE_DIR: /data/base
     INSTANCES_DIR: /app/JSONS/instances
     WIKI_STATUS_PATH: /data/status/STATUS.json
@@ -40,6 +51,7 @@ services:
       LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
       LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
       LLM_WIKI_OLLAMA_API_KEY: ${LLM_WIKI_OLLAMA_API_KEY:-}
+      LLM_WIKI_BACKEND: ${LLM_WIKI_BACKEND:-ollama}
       LLM_WIKI_OLLAMA_THINK: ${LLM_WIKI_OLLAMA_THINK:-true}
       LLM_WIKI_OLLAMA_NUM_PREDICT: ${LLM_WIKI_OLLAMA_NUM_PREDICT:-12000}
       WIKI_BASE_DIR: /data/base
