@@ -34,7 +34,7 @@ services:
       LLM_WIKI_RAW_DIR: /data/raw
       LLM_WIKI_ARCHIVE_DIR: /data/archive
       LLM_WIKI_POLL_INTERVAL: ${LLM_WIKI_POLL_INTERVAL:-60}
-      LLM_WIKI_CLAUDE_TIMEOUT: ${LLM_WIKI_CLAUDE_TIMEOUT:-300}
+      LLM_WIKI_CLAUDE_TIMEOUT: ${LLM_WIKI_CLAUDE_TIMEOUT:-600}
       LLM_WIKI_ROUTES: /app/JSONS/DSI-Wiki-Multi-Server-Config.json
       LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
       LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
