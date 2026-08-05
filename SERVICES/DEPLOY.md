@@ -1,7 +1,7 @@
 # DEPLOY.md — server-side deployment playbook
 
 For a Claude Code session (or a human) running **directly on the target server**, with no other
-context than this file. Written for the first deploy onto `ajan-simit-gtx1070` (192.168.1.83),
+context than this file. Written for the first deploy onto `example-host` (203.0.113.10),
 but generic enough for any Docker-capable Linux host with a local Ollama.
 
 This machine is expected to have an actual NVIDIA GPU (GTX1070) available to Ollama, unlike the
@@ -74,7 +74,7 @@ deployment's threat model (private LAN), but worth knowing.
 
 ```
 mkdir -p ~/BASE/MAIN && cd ~/BASE/MAIN     # or wherever this server's project convention lives
-git clone https://gitlab.com/darkstarinitiative/DSI-Wiki.git
+git clone <this repo's URL>
 cd DSI-Wiki
 ```
 
@@ -102,7 +102,7 @@ Leave `LLM_WIKI_POLL_INTERVAL` and `LLM_WIKI_CLAUDE_TIMEOUT` at their `.env.exam
 / 300s) unless step 6's real ingest test shows the GPU needs more time per generation — the 300s
 default was too short for the CPU-only dev laptop but should be generous for a GTX1070.
 
-Only `Cain-the-elder` ships in `SERVICES/instances.container/` (baked into the image at build
+Only `default-instance` ships in `SERVICES/instances.container/` (baked into the image at build
 time — the real, host-pathed `JSONS/instances/*.json` is gitignored and never enters the image).
 If this server needs additional instances (e.g. `ihalemobil`, `witch`, both of which point at
 host paths that only exist on the original dev machine), add their JSON files under
@@ -133,9 +133,9 @@ not an Ollama/LLM problem — fix before moving to step 6.
 Then sanity-check the real running stack:
 
 ```
-curl -sS http://localhost:8430/api/instances     # {"instances":["Cain-the-elder"]}
+curl -sS http://localhost:8430/api/instances     # {"instances":["default-instance"]}
 curl -sS http://localhost:8430/api/status         # live status once ingest has polled at least once
-curl -sS "http://localhost:8430/api/topics?instance=Cain-the-elder"   # {"topics":[]} before any real ingest
+curl -sS "http://localhost:8430/api/topics?instance=default-instance"   # {"topics":[]} before any real ingest
 ```
 
 Or just open `http://localhost:8430/http/dashboard` in a browser — the Health widget shows the
@@ -145,7 +145,7 @@ lets you create a `MAIN_`/`SUB_`/`INDEP_` topic without touching a terminal.
 ## 6. Real ingest test (needs working Ollama connectivity from step 1)
 
 Drop a real note into the configured `WIKI_RAW_DIR` — a topic name without `ihalemobil`/`witch`
-keywords will route to `Cain-the-elder` via `default_base_dir`:
+keywords will route to `default-instance` via `default_base_dir`:
 
 ```
 cat > "$WIKI_RAW_DIR/INDEP_DEPLOY_SMOKE_TEST.md" <<'EOF'
@@ -165,8 +165,8 @@ immediately with `SIGUSR1` to the ingest process/container):
 until [ ! -f "$WIKI_RAW_DIR/INDEP_DEPLOY_SMOKE_TEST.md" ]; do sleep 5; done
 ls "$WIKI_ARCHIVE_DIR"
 find "$WIKI_BASE_DIR" -iname "*DEPLOY_SMOKE_TEST*"
-curl -sS "http://localhost:8430/api/topics?instance=Cain-the-elder"
-curl -sS "http://localhost:8430/api/wiki?instance=Cain-the-elder&topic=INDEP_DEPLOY_SMOKE_TEST&layer=minified"
+curl -sS "http://localhost:8430/api/topics?instance=default-instance"
+curl -sS "http://localhost:8430/api/wiki?instance=default-instance&topic=INDEP_DEPLOY_SMOKE_TEST&layer=minified"
 ```
 
 If the raw file never disappears: check `docker logs <ingest-container-name> --tail 100` for
@@ -206,7 +206,7 @@ deployment itself — not just the generic repo docs.
 
 At this point: package builds, gateway serves, CLI reads, and a real note went through ingest →
 Ollama → all four layers → archive. This is the "first stake" — DSI-Wiki running as the first
-service on this server, cloned straight from `gitlab.com/darkstarinitiative/DSI-Wiki`.
+service on this server, cloned straight from this repo.
 
 Next steps from here are ordinary operations, not part of this playbook: point real raw-note
 sources at `$WIKI_RAW_DIR`, add real instances under `SERVICES/instances.container/` + rebuild as

@@ -58,7 +58,7 @@ fi
 
 # 3. Adapt systemd unit + config paths to this clone
 for f in "$ROOT"/SERVICES/*.service "$ROOT"/JSONS/DSI-Wiki-HTTP-Config.json; do
-    sed -i "s|/home/ozan/BASE/MAIN/DSI-Wiki|$ROOT|g" "$f"
+    sed -i "s|/home/user/BASE/MAIN/DSI-Wiki|$ROOT|g" "$f"
 done
 echo " * unit + config paths point at $ROOT."
 

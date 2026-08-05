@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 INSTANCES = REPO / "JSONS" / "instances"
-INSTANCE_NAME = "Cain-the-elder"
+INSTANCE_NAME = "default-instance"
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen3-worker"

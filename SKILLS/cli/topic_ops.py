@@ -16,7 +16,7 @@ LAYERS = ('raw', 'documentation', 'llm', 'minified', 'brief', 'changelog', 'devl
 
 def _base_dir():
     scan_dir = str(Path(__file__).resolve().parent.parent.parent / "JSONS" / "instances")
-    return load_instances(scan_dir)['Cain-the-elder']['base_dir']
+    return load_instances(scan_dir)['default-instance']['base_dir']
 
 
 def delete_topic(topic):

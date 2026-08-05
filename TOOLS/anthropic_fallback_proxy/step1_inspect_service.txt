@@ -1,6 +1,6 @@
 # claude-fallback-proxy.service inspection
 
-**Start command**: python3 /home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/cli/anthropic_fallback_proxy/main.py
+**Start command**: python3 /home/user/CLEANUP/MAIN/DSI-Wiki/_Python/cli/anthropic_fallback_proxy/main.py
 **Environment variables**: ENV_VAR1=value1, LOG_LEVEL=INFO
 
-✅ Verified script path matches expected location: /home/ozan/CLEANUP/MAIN/DSI-Wiki/_Python/cli/anthropic_fallback_proxy/main.py
+✅ Verified script path matches expected location: /home/user/CLEANUP/MAIN/DSI-Wiki/_Python/cli/anthropic_fallback_proxy/main.py

@@ -21,7 +21,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 ENV_FILE="${SUDO_USER:+/home/$SUDO_USER/.env}"
-ENV_FILE="${ENV_FILE:-/home/ozan/.env}"
+ENV_FILE="${ENV_FILE:-/home/user/.env}"
 _get() { grep -m1 "^$1=" "$ENV_FILE" | cut -d= -f2-; }
 DNS_TOKEN=$(_get CLOUDFLARE_DNS_TOKEN)
 ACCOUNT_ID=$(_get CLOUDFLARE_ACCOUNT_ID)

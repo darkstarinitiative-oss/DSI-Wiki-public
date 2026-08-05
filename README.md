@@ -1,5 +1,11 @@
 # DSI-Wiki
 
+> **This is a public, sanitized fork.** The primary repository is private
+> (see `INDEP_GIT_RULES`'s repo-visibility policy); this fork carries the same code with
+> real deployment specifics (hostnames, IPs, the account's own instance name, internal dev-log
+> docs) replaced with generic placeholders or removed. Functionally identical, nothing missing
+> that affects how the project works.
+
 **Version 0.1a**
 
 Multi-layer wiki generation and serving system. Raw notes dropped into a watched directory are

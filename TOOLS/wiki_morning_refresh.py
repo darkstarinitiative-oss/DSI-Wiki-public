@@ -6,13 +6,13 @@ Sequence (each step gates the next):
   1. Free the GPU: whatever holds VRAM at 10:00 (the SDXL training if it is still
      running or has hung/crashed, plus any stuck Bonsai/hermes) is terminated and
      the Ollama model is unloaded, until VRAM is confirmed low.
-  2. Back up the wiki data dir (/home/ozan/CLEANUP/DATA) to a timestamped tarball.
+  2. Back up the wiki data dir (/home/user/CLEANUP/DATA) to a timestamped tarball.
   3. ONLY if the backup succeeded: create per-topic dispatcher tasks for every
      wiki topic (all MAIN_ and SUB_ pages) — each task runs fact_scan then
      fact_check. The freed GPU lets Bonsai do the fact-check pass.
 
 Self-removes its crontab line at the end so it runs exactly once.
-Logs to /home/ozan/CLEANUP/DATA/_morning_refresh.log
+Logs to /home/user/CLEANUP/DATA/_morning_refresh.log
 """
 import os
 import re
@@ -25,9 +25,9 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.expanduser("~/READY/DSI-Database"))
 
-DATA_DIR = Path(os.environ.get("WIKI_DATA_DIR", "/home/ozan/CLEANUP/DATA"))
+DATA_DIR = Path(os.environ.get("WIKI_DATA_DIR", "/home/user/CLEANUP/DATA"))
 DOC_DIR = DATA_DIR / "Wiki-BASE" / "documentation"
-BACKUP_DIR = Path("/home/ozan/backups")
+BACKUP_DIR = Path("/home/user/backups")
 LOG_FILE = DATA_DIR / "_morning_refresh.log"
 OLLAMA_MODEL = "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0"
 TRAIN_MATCH = "sdxl_train_network.py"

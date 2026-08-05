@@ -15,13 +15,13 @@ from gateway.api_app import load_instances
 
 def _base_dir():
     scan_dir = str(Path(__file__).resolve().parent.parent.parent / "JSONS" / "instances")
-    return load_instances(scan_dir)['Cain-the-elder']['base_dir']
+    return load_instances(scan_dir)['default-instance']['base_dir']
 
 
 LAYERS = ('raw', 'documentation', 'llm', 'minified', 'brief', 'changelog', 'devlog', 'silinmişler')
 
 
-def write_topic(topic: str, layer: str, content: str, instance: str = 'Cain-the-elder') -> Path:
+def write_topic(topic: str, layer: str, content: str, instance: str = 'default-instance') -> Path:
     """Write content to a topic in a specific layer."""
     scan_dir = str(Path(__file__).resolve().parent.parent.parent / "JSONS" / "instances")
     instances = load_instances(scan_dir)
@@ -47,7 +47,7 @@ def write_topic(topic: str, layer: str, content: str, instance: str = 'Cain-the-
 def main():
     parser = argparse.ArgumentParser(description="Write a DSI-Wiki topic's content.")
     parser.add_argument("topic")
-    parser.add_argument("--instance", default="Cain-the-elder")
+    parser.add_argument("--instance", default="default-instance")
     parser.add_argument("--layer", default="minified", choices=LAYERS)
     parser.add_argument("--content", help="Content to write (if not provided, reads from stdin)")
     parser.add_argument("--file", help="Read content from file")

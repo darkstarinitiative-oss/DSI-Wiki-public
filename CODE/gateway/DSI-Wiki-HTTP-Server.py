@@ -2,7 +2,7 @@
 """DSI-Wiki-HTTP-Server.py — top-level gateway on a single port.
 Mounts three sub-apps: /api (read-only REST bridge), /mcp (MCP protocol,
 streamable-HTTP), /http (browsable UI). External callers reach each surface
-through its own subdomain (wiki-api / wiki-mcp / wiki-http .dsigames.com.tr),
+through its own subdomain (wiki-api / wiki-mcp / wiki-http .example.com),
 all forwarded by Cloudflare Tunnel to this same origin:port — the tunnel
 can't rewrite paths, so a Host-header dispatch middleware here maps each
 configured hostname to its internal mount, driven by `subdomain_routes` in

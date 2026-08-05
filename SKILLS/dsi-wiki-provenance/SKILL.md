@@ -8,13 +8,13 @@ description: Trace where a claim (string) appears across all layers of a DSI-Wik
 ## Usage
 
 ```
-DSI-wiki-provenance [--instance Cain-the-elder] [--topic <topic_filter>] "<claim string>"
+DSI-wiki-provenance [--instance default-instance] [--topic <topic_filter>] "<claim string>"
 ```
 
 Examples:
 ```
 DSI-wiki-provenance "qwen2.5-coder"
-DSI-wiki-provenance --instance Cain-the-elder --topic INDEP_LLM_RULES "Bonsai"
+DSI-wiki-provenance --instance default-instance --topic INDEP_LLM_RULES "Bonsai"
 ```
 
 Output: one line per hit — `<layer>/<topic>.md | <line_no> | <mtime> | <matching line excerpt>`.

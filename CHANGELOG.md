@@ -36,7 +36,7 @@ This file starts at `0.1.0` — earlier history predates the changelog and isn't
   viewer at `/http/info-viewer` that works against any URL implementing the standard.
 - Cloudflare Tunnel Connector (`SERVICES/cloudflared-install.sh`,
   `cloudflared.service`) — public access via `wiki`/`wiki-api`/`wiki-http`/`wiki-mcp`
-  `.dsigames.com.tr`, scoped so unrelated hostnames on the shared account tunnel 404 instead of
+  `.example.com`, scoped so unrelated hostnames on the shared account tunnel 404 instead of
   proxying to a port/SSH not present on this host.
 - Pluggable LLM backend auth: `LLM_WIKI_OLLAMA_API_KEY` (optional) sends
   `Authorization: Bearer <key>`, so Ollama Cloud / a HuggingFace OpenAI-compatible endpoint / a

@@ -13,11 +13,11 @@ the ingest service actually uses, instead of a hardcoded guess:
   1. --raw-dir argument
   2. $LLM_WIKI_RAW_DIR
   3. LLM_WIKI_RAW_DIR from the ingest service's EnvironmentFile
-  4. hard fallback: /home/ozan/CLEANUP/DATA/Wiki-RAW
+  4. hard fallback: /home/user/CLEANUP/DATA/Wiki-RAW
 
 Routing: the ingest service routes a note to an instance by matching a route
 keyword contained in the topic name; a topic with no keyword lands in the
-default instance (Cain-the-elder). So a plain topic like
+default instance (default-instance). So a plain topic like
 `dispatcher-run-t_1a2b3c4d` goes to the default wiki, while a topic containing
 e.g. `witch` routes to the witch instance.
 
@@ -34,7 +34,7 @@ import tempfile
 from pathlib import Path
 
 INGEST_ENV_FILE = Path(__file__).resolve().parent.parent / "CODE" / "ingest" / ".env"
-FALLBACK_RAW_DIR = Path(os.environ.get("WIKI_RAW_DIR", "/home/ozan/CLEANUP/DATA/Wiki-RAW"))
+FALLBACK_RAW_DIR = Path(os.environ.get("WIKI_RAW_DIR", "/home/user/CLEANUP/DATA/Wiki-RAW"))
 
 # A topic becomes a filename stem, so keep it to safe characters only.
 _VALID_TOPIC = re.compile(r"^[A-Za-z0-9._-]+$")

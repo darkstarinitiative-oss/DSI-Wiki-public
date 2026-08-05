@@ -8,8 +8,8 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-RAW_DIR = Path("/home/ozan/LLM-Wiki/raw")
-STAGING_MINIFIED = Path("/home/ozan/LLM-Wiki-BASE-staging/minified")
+RAW_DIR = Path("/home/user/LLM-Wiki/raw")
+STAGING_MINIFIED = Path("/home/user/LLM-Wiki-BASE-staging/minified")
 
 # Ana Başlık → kaynak dizin/dosya listesi (DocumentUpdatePlan kaynak tablosundan)
 TOPICS = {

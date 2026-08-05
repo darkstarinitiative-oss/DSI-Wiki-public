@@ -108,15 +108,15 @@ def _handle_wake_signal(signum, frame):
     log(">> SIGUSR1 alindi, bekleme kesiliyor, kuyruk hemen kontrol edilecek.")
     _wake_event.set()
 
-RAW_DIR = Path(os.environ.get("LLM_WIKI_RAW_DIR", "/home/ozan/LLM-Wiki/raw"))
-ARCHIVE_DIR = Path(os.environ.get("LLM_WIKI_ARCHIVE_DIR", "/home/ozan/LLM-Wiki/raw_archive"))
+RAW_DIR = Path(os.environ.get("LLM_WIKI_RAW_DIR", "/home/user/LLM-Wiki/raw"))
+ARCHIVE_DIR = Path(os.environ.get("LLM_WIKI_ARCHIVE_DIR", "/home/user/LLM-Wiki/raw_archive"))
 POLL_INTERVAL = int(os.environ.get("LLM_WIKI_POLL_INTERVAL", "60"))
 CLAUDE_TIMEOUT = int(os.environ.get("LLM_WIKI_CLAUDE_TIMEOUT", "600"))
 
 # Çoklu instance yönlendirme — her route kendi base_dir + layers'ını taşır (bkz.
 # JSONS/instances/*.json, DSI-Wiki-Service-Supervisor.py tarafından üretilir).
 # Eşleşme yoksa default_base_dir / default_layers kullanılır.
-ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/ozan/LLM-Wiki/ingest_routes.json"))
+ROUTES_PATH = Path(os.environ.get("LLM_WIKI_ROUTES", "/home/user/LLM-Wiki/ingest_routes.json"))
 ROUTES_RELOAD_INTERVAL = 1800
 _routes_cache = {"routes": [], "default_base_dir": None, "default_layers": None, "loaded_at": 0.0}
 

@@ -1,9 +1,9 @@
 #!/bin/bash
-# dispatcher-run-t_* topic'lerini Cain-the-elder base_dir'inden arşive taşı (silme YOK, geri alınabilir).
+# dispatcher-run-t_* topic'lerini default-instance base_dir'inden arşive taşı (silme YOK, geri alınabilir).
 # Kullanım: archive_dispatcher_run_topics.sh [--dry-run]
 set -euo pipefail
-BASE=/home/ozan/CLEANUP/DATA/Wiki-BASE
-ARC=/home/ozan/CLEANUP/DATA/Wiki-ARCHIVE/dispatcher-run-topics
+BASE=/home/user/CLEANUP/DATA/Wiki-BASE
+ARC=/home/user/CLEANUP/DATA/Wiki-ARCHIVE/dispatcher-run-topics
 DRY=${1:-}
 moved=0
 for layer_dir in "$BASE"/*/; do

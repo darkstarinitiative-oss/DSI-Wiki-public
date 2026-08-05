@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMG=dsi-wiki-test
 CTR=dsi-wiki-test-run
 PORT=18430
-INSTANCE=Cain-the-elder
+INSTANCE=default-instance
 
 cleanup() { docker rm -f "$CTR" >/dev/null 2>&1 || true; }
 trap cleanup EXIT

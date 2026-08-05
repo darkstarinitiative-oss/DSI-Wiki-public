@@ -16,7 +16,7 @@ from gateway.api_app import load_instances, search
 def main():
     parser = argparse.ArgumentParser(description="Search DSI-Wiki content.")
     parser.add_argument("query")
-    parser.add_argument("--instance", default="Cain-the-elder")
+    parser.add_argument("--instance", default="default-instance")
     parser.add_argument("--layer", default="all")
     args = parser.parse_args()
 

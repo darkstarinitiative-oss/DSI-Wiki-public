@@ -61,7 +61,7 @@ def _search_dirs(base_dir):
 def main():
     parser = argparse.ArgumentParser(
         description="Trace where a claim appears across a DSI-Wiki instance's layers.")
-    parser.add_argument("--instance", default="Cain-the-elder", help="wiki instance name")
+    parser.add_argument("--instance", default="default-instance", help="wiki instance name")
     parser.add_argument("claim", help="claim substring to search for (case-insensitive)")
     parser.add_argument("--topic", help="restrict to files whose topic name contains this")
     args = parser.parse_args()

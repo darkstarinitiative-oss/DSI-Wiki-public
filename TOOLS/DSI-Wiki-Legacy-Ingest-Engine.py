@@ -8,7 +8,7 @@ import importlib.util
 from pathlib import Path
 from datetime import datetime, timezone
 
-BASE_DIR = os.environ.get("LLM_WIKI_BASE_DIR", "/home/ozan/LLM-Wiki-BASE")
+BASE_DIR = os.environ.get("LLM_WIKI_BASE_DIR", "/home/user/LLM-Wiki-BASE")
 MAX_RETRIES = 3
 CALL_DELAY_SECONDS = 15  # RPM throttle — çağrılar arası bekleme
 

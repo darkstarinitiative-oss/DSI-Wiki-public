@@ -9,7 +9,7 @@ description: Compare documentation vs minified layers of DSI-Wiki topics with a 
 
 ```
 DSI-wiki-internal-scan --topic INDEP_LLM_RULES
-DSI-wiki-internal-scan --instance Cain-the-elder --all
+DSI-wiki-internal-scan --instance default-instance --all
 ```
 
 - Compares factual claims (model names, paths, ports, commands, statuses) between the

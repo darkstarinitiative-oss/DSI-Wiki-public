@@ -35,13 +35,13 @@ from common.ollama_lock import call_ollama as _locked_call_ollama
 MODEL = "qwen3:1.7b"
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 INSTANCES_DIR = Path(os.environ.get("INSTANCES_DIR", str(REPO_ROOT / "JSONS" / "instances")))
-WIKI_BASE_DIR = os.environ.get("WIKI_BASE_DIR", "/home/ozan/CLEANUP/DATA/Wiki-BASE")
+WIKI_BASE_DIR = os.environ.get("WIKI_BASE_DIR", "/home/user/CLEANUP/DATA/Wiki-BASE")
 LOG_DIR = Path(WIKI_BASE_DIR) / "_nightly_factcheck_logs"
 # Read-only sandbox root for the whitelisted toolset below. Was a hardcoded
-# /home/ozan, which doesn't cover a deployment whose repo/data live under a
+# /home/user, which doesn't cover a deployment whose repo/data live under a
 # different root (e.g. /BIG) -- make it match wherever this deployment actually
 # put things.
-SAFE_ROOT = Path(os.environ.get("NIGHTLY_FACTCHECK_SAFE_ROOT", "/home/ozan")).resolve()
+SAFE_ROOT = Path(os.environ.get("NIGHTLY_FACTCHECK_SAFE_ROOT", "/home/user")).resolve()
 MAX_TOOL_TURNS = 8
 SKIP_TOPICS = {"INDEP_LLM_RULES"}
 
@@ -211,7 +211,7 @@ def call_ollama(messages, tools=None):
 
 
 SYSTEM_PROMPT = """You are fact-checking one page of technical documentation against the live system, \
-using the provided tools (all read-only, restricted to paths under /home/ozan). Known base paths, so \
+using the provided tools (all read-only, restricted to paths under /home/user). Known base paths, so \
 you don't have to guess or explore blindly: DSI-Wiki repo root = {repo_root}, wiki data \
 root = {wiki_base_dir}. Relative paths mentioned in the doc (e.g. `CODE/foo.py`) are \
 almost always relative to the DSI-Wiki repo root above — try that first before exploring elsewhere.

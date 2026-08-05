@@ -12,9 +12,9 @@ directly — pure file reads, no server round-trip.
 ## Usage
 
 ```
-DSI-wiki-topics [--instance Cain-the-elder] [--layer minified]
-DSI-wiki-get <topic> [--instance Cain-the-elder] [--layer minified]
-DSI-wiki-search <query> [--instance Cain-the-elder] [--layer all]
+DSI-wiki-topics [--instance default-instance] [--layer minified]
+DSI-wiki-get <topic> [--instance default-instance] [--layer minified]
+DSI-wiki-search <query> [--instance default-instance] [--layer all]
 ```
 
 - `DSI-wiki-topics` — one topic per line.

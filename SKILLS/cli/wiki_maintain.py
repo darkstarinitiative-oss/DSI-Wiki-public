@@ -21,7 +21,7 @@ if _SCRIPTS_ROOT not in sys.path:
 
 from gateway.api_app import load_instances, LAYERS
 
-DEFAULT_INSTANCE = "Cain-the-elder"
+DEFAULT_INSTANCE = "default-instance"
 
 
 def get_base_dir(instance: str = DEFAULT_INSTANCE) -> Path:

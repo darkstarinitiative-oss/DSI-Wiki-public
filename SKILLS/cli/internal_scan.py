@@ -42,7 +42,7 @@ def _ask_bonsai(doc, mini):
 
 def main():
     parser = argparse.ArgumentParser(description="DSI-Wiki internal drift scan")
-    parser.add_argument("--instance", default="Cain-the-elder")
+    parser.add_argument("--instance", default="default-instance")
     parser.add_argument("--topic")
     parser.add_argument("--all", action="store_true")
     args = parser.parse_args()

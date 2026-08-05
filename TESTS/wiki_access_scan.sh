@@ -4,10 +4,10 @@
 # Usage: wiki_access_scan.sh scan    -> write offender list to reports/wiki-access-sunnet.md, exit 0
 #        wiki_access_scan.sh verify  -> exit 0 if no offenders remain, 1 otherwise
 PAT='mcp__llm-wiki|localhost:8430|127\.0\.0\.1:8430|CLEANUP/DATA/Wiki-BASE'
-REPORT=/home/ozan/CLEANUP/MAIN/DSI-Wiki/reports/wiki-access-sunnet.md
+REPORT=/home/user/CLEANUP/MAIN/DSI-Wiki/reports/wiki-access-sunnet.md
 
 scan() {
-    grep -rn -E "$PAT" /home/ozan/READY /home/ozan/.local/bin /home/ozan/codebase/projects \
+    grep -rn -E "$PAT" /home/user/READY /home/user/.local/bin /home/user/codebase/projects \
         --include='*.py' --include='*.sh' \
         --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=node_modules 2>/dev/null \
         | grep -v 'DSI-Wiki/' | grep -v '_nightly_factcheck_logs'

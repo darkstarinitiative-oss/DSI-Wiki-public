@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 doc_batch.py — 7 DSI projesinin kapsamlı dökümantasyonunu üretir.
-Çalıştırma: python3 /home/ozan/LLM-Wiki/doc_batch.py
+Çalıştırma: python3 /home/user/LLM-Wiki/doc_batch.py
 
 Her proje için:
   1. raw kaynak dosyaları + 5 şablonu okur
@@ -27,9 +27,9 @@ def _load_sibling(filename: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-V1_RAW = Path("/home/ozan/LLM-Wiki-BASE/raw")
-V2_BASE = Path("/home/ozan/LLM-Wiki-BASE-v2")
-LOG_FILE = Path("/home/ozan/LLM-Wiki/batch.log")
+V1_RAW = Path("/home/user/LLM-Wiki-BASE/raw")
+V2_BASE = Path("/home/user/LLM-Wiki-BASE-v2")
+LOG_FILE = Path("/home/user/LLM-Wiki/batch.log")
 DELAY = 20  # saniye (provider rate-limit)
 
 sys.path.insert(0, str(WIKI_DIR))
@@ -47,7 +47,7 @@ PROJECTS = [
         "topic": "DSIDispatcher",
         "name": "DSI Dispatcher++",
         "raw_files": ["DSIDispatcher.md", "Dispatcher-plus-plus.md"],
-        "code_dir": "/home/ozan/READY/Dispatcher-plus-plus",
+        "code_dir": "/home/user/READY/Dispatcher-plus-plus",
     },
     {
         "topic": "DSIGenerativeVisualContentServer",
@@ -58,7 +58,7 @@ PROJECTS = [
             "dsi-gvcs.md",
             "DSI-GVCS-Egitim-Veri-Hazirlama.md",
         ],
-        "code_dir": "/home/ozan/codebase/projects/dsi-gvcs",
+        "code_dir": "/home/user/codebase/projects/dsi-gvcs",
     },
     {
         "topic": "DSIHermesProviderManagement",
@@ -69,7 +69,7 @@ PROJECTS = [
             "hermes-infra-monitor-cron.md",
             "planned-migration__hermes-custom-provider-management.md",
         ],
-        "code_dir": "/home/ozan/READY/Hermes-CustomProviderManagement",
+        "code_dir": "/home/user/READY/Hermes-CustomProviderManagement",
     },
     {
         "topic": "DSISocialMediaAutomation",
@@ -85,25 +85,25 @@ PROJECTS = [
             "Social-Media-Hashtag-Strategy.md",
             "DSI-Social-Media.md",
         ],
-        "code_dir": "/home/ozan/codebase/projects/hermes-social-automation",
+        "code_dir": "/home/user/codebase/projects/hermes-social-automation",
     },
     {
         "topic": "DSISystemCore",
         "name": "DSI System Core",
         "raw_files": ["DSISystemCore.md", "DSI-System.md", "DSI-MAINBOARD.md"],
-        "code_dir": "/home/ozan/codebase/projects/DSI-System",
+        "code_dir": "/home/user/codebase/projects/DSI-System",
     },
     {
         "topic": "DSIYamYamLar",
         "name": "DSI YamYamLar Task Optimization",
         "raw_files": ["DSIYamYamLarTaskOptimization.md", "YamYamLar.md", "yamyamlar.md"],
-        "code_dir": "/home/ozan/codebase/projects/yamyamlar",
+        "code_dir": "/home/user/codebase/projects/yamyamlar",
     },
     {
         "topic": "DSIIhaleMobil",
         "name": "DSI İhaleMobil",
         "raw_files": ["DSIİhaleMobil.md", "ihalemobil.md"],
-        "code_dir": "/home/ozan/codebase/projects/ihalemobil",
+        "code_dir": "/home/user/codebase/projects/ihalemobil",
     },
 ]
 

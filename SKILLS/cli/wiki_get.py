@@ -16,7 +16,7 @@ from gateway.api_app import load_instances, get_content
 def main():
     parser = argparse.ArgumentParser(description="Print a DSI-Wiki topic's content.")
     parser.add_argument("topic")
-    parser.add_argument("--instance", default="Cain-the-elder")
+    parser.add_argument("--instance", default="default-instance")
     parser.add_argument("--layer", default="minified")
     args = parser.parse_args()
 

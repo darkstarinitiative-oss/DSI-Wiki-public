@@ -11,7 +11,7 @@ LAYERS = ('raw', 'documentation', 'llm', 'minified', 'brief', 'changelog', 'devl
 
 def _base_dir():
     scan_dir = str(Path(__file__).resolve().parent.parent / "JSONS" / "instances")
-    return load_instances(scan_dir)['Cain-the-elder']['base_dir']
+    return load_instances(scan_dir)['default-instance']['base_dir']
 
 def read_layer(topic: str, layer: str) -> str:
     base = Path(_base_dir())
@@ -66,10 +66,10 @@ FIXES['MAIN_DSI-ATLAS-R.md'] = {
 
 # 3. MAIN_DSI-Agent-Profiles
 FIXES['MAIN_DSI-Agent-Profiles.md'] = {
-    'llm': """D:/home/ozan/CLEANUP/MAIN/hermes-social-automation/profiles/
-- Folder structure only known; source (`/home/ozan/CLEANUP/MAIN/hermes-social-automation/profiles/`) not yet scanned in detail. No documentation generated from actual profile file contents.
+    'llm': """D:/home/user/CLEANUP/MAIN/hermes-social-automation/profiles/
+- Folder structure only known; source (`/home/user/CLEANUP/MAIN/hermes-social-automation/profiles/`) not yet scanned in detail. No documentation generated from actual profile file contents.
 - CORRECTED (2026-07-23, nightly fact-check): Root source path `~/.hermes/profiles/` exists and is a directory.
-- CORRECTED (2026-07-27, nightly fact-check): Root source path `/home/ozan/CLEANUP/MAIN/hermes-social-automation/profiles/` does not exist; the claimed `.hermes/profiles/` path was a hallucination in the raw notes.
+- CORRECTED (2026-07-27, nightly fact-check): Root source path `/home/user/CLEANUP/MAIN/hermes-social-automation/profiles/` does not exist; the claimed `.hermes/profiles/` path was a hallucination in the raw notes.
 - Subdirectories (per raw notes): `profiles/orchestrator/`, `profiles/worker/`, `profiles/code-writer/`, `profiles/code-analyst/`, `profiles/reviewer/`.
 - Cross-references in source tree: DSI-Wiki > Ingest-Service; DSI-Social-Media > Twitter/Instagram/Content-Pipeline; DSI-System > Agent-Runtime.
 - Not documented: how profiles are loaded by the agent runtime and their per-profile configuration.
@@ -79,7 +79,7 @@ FIXES['MAIN_DSI-Agent-Profiles.md'] = {
 - Usage: Not covered in raw source.
 - Known Issues & Limitations: Source path corrections applied (2026-07-23, 2026-07-27). Actual profile file contents unscanned.
 - Missing Information: Profile loading mechanism, per-profile config, actual profile.yaml contents.""",
-    'minified': """DSI-Agent-Profiles is the collection of DSI agent-role definitions; the source path has been corrected twice by nightly fact-checks (2026-07-23, 2026-07-27) and the current recorded path `/home/ozan/CLEANUP/MAIN/hermes-social-automation/profiles/` does not exist — the earlier `~/.hermes/profiles/` claim was a hallucination. Subdirectories per raw notes: orchestrator/, worker/, code-writer/, code-analyst/, reviewer/. Cross-referenced from DSI-Wiki (Ingest-Service), DSI-Social-Media (Twitter/Instagram/Content-Pipeline), and DSI-System (Agent-Runtime). No documentation exists yet for how profiles are loaded by the agent runtime or their per-profile configuration; actual profile file contents remain unscanned. Problem & Motivation, TEC, Configuration, Usage not covered in raw source."""
+    'minified': """DSI-Agent-Profiles is the collection of DSI agent-role definitions; the source path has been corrected twice by nightly fact-checks (2026-07-23, 2026-07-27) and the current recorded path `/home/user/CLEANUP/MAIN/hermes-social-automation/profiles/` does not exist — the earlier `~/.hermes/profiles/` claim was a hallucination. Subdirectories per raw notes: orchestrator/, worker/, code-writer/, code-analyst/, reviewer/. Cross-referenced from DSI-Wiki (Ingest-Service), DSI-Social-Media (Twitter/Instagram/Content-Pipeline), and DSI-System (Agent-Runtime). No documentation exists yet for how profiles are loaded by the agent runtime or their per-profile configuration; actual profile file contents remain unscanned. Problem & Motivation, TEC, Configuration, Usage not covered in raw source."""
 }
 
 # 4. MAIN_DSI-Cross-Market-Crypto (NEW - only in documentation)
@@ -103,7 +103,7 @@ R:python3 -m api.main   # or: uvicorn api.main:app  (from ~/READY/DSI-Database);
 X:port 9123 (FastAPI "DSI-Database API"; /health /keys /providers /models /profiles /tasks /executions /events /metrics; no auth) — NOT currently listening
 
 - Actively developed, in-progress migration. Renamed 2026-07-20 from mistakenly-titled `MAIN_DSI-Agent-Simit` — content was always about this project, only the topic name was wrong (a 2026-07-18 raw note had proposed `MAIN_DSI-Database` as the topic name, but ingest created it under the wrong name; see `MAIN_DSI-Wiki` Known Issues for the mechanism gap that allowed this).
-- `~/READY/DSI-Database/` is a standalone project directory — not its own git repo, nested inside one large repo rooted at `/home/ozan`, on branch `development`; recent commits at HEAD.
+- `~/READY/DSI-Database/` is a standalone project directory — not its own git repo, nested inside one large repo rooted at `/home/user`, on branch `development`; recent commits at HEAD.
 - Phase 1 of the "Ajan Simit" plan (remove Hermes as a vital DSI dependency). Replaces Dispatcher++'s 7 kanban SQLite DBs, per-task `state.json` sidecars, and `source_registry.py` locks with one consolidated SQLite schema (`databases/dispatcher/schema.sql`, WAL, 11 tables) plus a FastAPI service (`api/main.py`, "DSI-Database API", uvicorn port 9123, 8 routers + /health, no auth).
 - DB layer: `databases/dispatcher/db.py`'s `DSIDatabase` class defaulting to `~/READY/DSI-Database/DATA/dsi-dispatcher.db`.
 - Problem & Motivation: Replace fragmented Hermes SQLite DBs with consolidated schema.
@@ -111,7 +111,7 @@ X:port 9123 (FastAPI "DSI-Database API"; /health /keys /providers /models /profi
 - Usage: `python3 -m api.main` or `uvicorn api.main:app` from `~/READY/DSI-Database/`; `sqlite3 ~/READY/DSI-Database/DATA/dsi-dispatcher.db`.
 - Known Issues & Limitations: API not currently listening on port 9123. Migration in progress.
 - Missing Information: Full router details, authentication plan, migration status per Dispatcher++ board.""",
-    'minified': """DSI-Database (`~/READY/DSI-Database/`, nested in the /home/ozan repo, branch `development`) is Phase 1 of the "Ajan Simit" plan to remove Hermes as a core DSI dependency: it replaces Dispatcher++'s 7 kanban SQLite DBs, per-task `state.json` sidecars, and `source_registry.py` locks with one consolidated SQLite schema (`databases/dispatcher/schema.sql`, WAL, 11 tables) plus a FastAPI service (`api/main.py`, "DSI-Database API", uvicorn port 9123, 8 routers + /health, no auth). The DB layer is `databases/dispatcher/db.py`'s `DSIDatabase` class defaulting to `~/READY/DSI-Database/DATA/dsi-dispatcher.db`. Renamed 2026-07-20 from the mistakenly-titled `MAIN_DSI-Agent-Simit` (content was always correct; only the topic name was wrong — a 2026-07-18 raw note had proposed the correct name but ingest created it under the wrong one). Configuration via `~/.hermes/config.yaml` (custom_providers) and `~/.hermes/.env`. API not currently listening on port 9123; migration in progress."""
+    'minified': """DSI-Database (`~/READY/DSI-Database/`, nested in the /home/user repo, branch `development`) is Phase 1 of the "Ajan Simit" plan to remove Hermes as a core DSI dependency: it replaces Dispatcher++'s 7 kanban SQLite DBs, per-task `state.json` sidecars, and `source_registry.py` locks with one consolidated SQLite schema (`databases/dispatcher/schema.sql`, WAL, 11 tables) plus a FastAPI service (`api/main.py`, "DSI-Database API", uvicorn port 9123, 8 routers + /health, no auth). The DB layer is `databases/dispatcher/db.py`'s `DSIDatabase` class defaulting to `~/READY/DSI-Database/DATA/dsi-dispatcher.db`. Renamed 2026-07-20 from the mistakenly-titled `MAIN_DSI-Agent-Simit` (content was always correct; only the topic name was wrong — a 2026-07-18 raw note had proposed the correct name but ingest created it under the wrong one). Configuration via `~/.hermes/config.yaml` (custom_providers) and `~/.hermes/.env`. API not currently listening on port 9123; migration in progress."""
 }
 
 # 6. MAIN_DSI-Dispatcher-Plus-Plus

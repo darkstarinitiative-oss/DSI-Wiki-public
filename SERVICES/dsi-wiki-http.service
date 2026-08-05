@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ozan/BASE/MAIN/DSI-Wiki/CODE/gateway
-ExecStart=/usr/bin/python3 /home/ozan/BASE/MAIN/DSI-Wiki/CODE/gateway/DSI-Wiki-HTTP-Server.py
+WorkingDirectory=/home/user/BASE/MAIN/DSI-Wiki/CODE/gateway
+ExecStart=/usr/bin/python3 /home/user/BASE/MAIN/DSI-Wiki/CODE/gateway/DSI-Wiki-HTTP-Server.py
 Restart=on-failure
 RestartSec=5
 

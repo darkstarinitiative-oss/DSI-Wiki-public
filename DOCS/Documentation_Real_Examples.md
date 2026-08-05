@@ -59,7 +59,7 @@ graph TD
 
 [DEVLOG]
 - 2026-07-17: Running `git status`/`git add -A` inside DSI-Wiki before it had its own `.git`
-  would have resolved to the parent `/home/ozan` repo — caught before executing, fixed by
+  would have resolved to the parent `/home/user` repo — caught before executing, fixed by
   `git init` directly inside DSI-Wiki.
 - 2026-07-17: GitLab API 404 on `/groups/darkstarinitiative/projects` — `darkstarinitiative`
   is a user namespace, not a group. Fixed by looking up `namespace_id` via `/api/v4/namespaces?search=`.

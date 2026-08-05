@@ -9,7 +9,7 @@
 set -uo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
-INSTANCE="${1:-Cain-the-elder}"
+INSTANCE="${1:-default-instance}"
 pass=0; fail=0; rows=()
 
 run() {

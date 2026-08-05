@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ozan/BASE/MAIN/DSI-Wiki/CODE/ingest
-EnvironmentFile=/home/ozan/BASE/MAIN/DSI-Wiki/CODE/ingest/.env
-ExecStart=/usr/bin/python3 /home/ozan/BASE/MAIN/DSI-Wiki/CODE/ingest/DSI-Wiki-Ingest-Service-Class.py
+WorkingDirectory=/home/user/BASE/MAIN/DSI-Wiki/CODE/ingest
+EnvironmentFile=/home/user/BASE/MAIN/DSI-Wiki/CODE/ingest/.env
+ExecStart=/usr/bin/python3 /home/user/BASE/MAIN/DSI-Wiki/CODE/ingest/DSI-Wiki-Ingest-Service-Class.py
 Restart=on-failure
 RestartSec=5
 

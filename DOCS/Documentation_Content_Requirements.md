@@ -5,7 +5,7 @@ ingest. It defines the minimum section checklist every `[CONTEXT]` block (MAIN_/
 any layer built from the `documentation` layer) must satisfy, plus the rule that keeps that
 checklist from turning into hallucinated filler. This document is enforced in code —
 the `layers.documentation.prompt` field of the active instance's JSON
-(`JSONS/instances/<name>.json`, e.g. `Cain-the-elder.json`) is this checklist, sent to the
+(`JSONS/instances/<name>.json`, e.g. `default-instance.json`) is this checklist, sent to the
 local Ollama model on every ingest.
 
 ## Why this exists
