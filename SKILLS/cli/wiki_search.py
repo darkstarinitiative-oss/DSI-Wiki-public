@@ -30,8 +30,15 @@ def main():
     results = search(base_dir, args.query, args.layer)
     if not results:
         sys.exit(1)
+    query_lower = args.query.lower()
     for r in results:
-        excerpt = " ".join(r["excerpt"][:200].split())
+        # search() already centers r["excerpt"] on the match within the full
+        # document; re-center the shorter terminal preview within that excerpt
+        # too, or a match near the end of the (already offset) excerpt gets cut
+        # off by a naive [:200] here.
+        idx = r["excerpt"].lower().find(query_lower)
+        start = max(0, idx - 60) if idx != -1 else 0
+        excerpt = " ".join(r["excerpt"][start:start + 200].split())
         print(f"{r['layer']}/{r['topic']}: {excerpt}")
 
 

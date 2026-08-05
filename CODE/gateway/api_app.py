@@ -57,8 +57,17 @@ def search(base_dir, query, layer):
             if not fname.endswith(".md"):
                 continue
             content = open(os.path.join(d, fname), encoding="utf-8", errors="ignore").read()
-            if query_lower in content.lower() or query_lower in fname.lower():
-                results.append({"layer": lyr, "topic": fname[:-3], "excerpt": content[:1500]})
+            match_idx = content.lower().find(query_lower)
+            if match_idx != -1 or query_lower in fname.lower():
+                # Center the excerpt on the match so it's actually visible in long
+                # documents, instead of always showing the first 1500 chars (which,
+                # for a doc where the match is further in, silently omits it).
+                if match_idx == -1:
+                    excerpt = content[:1500]
+                else:
+                    start = max(0, match_idx - 300)
+                    excerpt = content[start:start + 1500]
+                results.append({"layer": lyr, "topic": fname[:-3], "excerpt": excerpt})
     return results[:10]
 
 
