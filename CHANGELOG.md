@@ -7,6 +7,39 @@ this repo follows).
 
 This file starts at `0.1.0` — earlier history predates the changelog and isn't reconstructed here.
 
+## [0.2.0] - 2026-08-05
+
+### Added
+- DSI Info API Standard (`DOCS/info-api-standard.md`): a passthrough-adapter JSON contract
+  (`service`/`version`/`status`/`status_note`/`services[]`/`last_heartbeat`/`feed[]`) for
+  cross-project live monitoring. Implemented at `GET /api/info`, with a generic conformance
+  viewer at `/http/info-viewer` that works against any URL implementing the standard.
+- Cloudflare Tunnel Connector (`SERVICES/cloudflared-install.sh`,
+  `cloudflared.service`) — public access via `wiki`/`wiki-api`/`wiki-http`/`wiki-mcp`
+  `.dsigames.com.tr`, scoped so unrelated hostnames on the shared account tunnel 404 instead of
+  proxying to a port/SSH not present on this host.
+- Pluggable LLM backend auth: `LLM_WIKI_OLLAMA_API_KEY` (optional) sends
+  `Authorization: Bearer <key>`, so Ollama Cloud / a HuggingFace OpenAI-compatible endpoint / a
+  self-hosted router is a `.env` change instead of a code change (`DOCS/llm-backend-roadmap.md`).
+- `TESTS/run_full_test_suite.sh` — 19 automated checks (every API endpoint, both UI pages, all
+  CLI proxies, an MCP round-trip, the pluggable-backend header, 5 live health checks). Required
+  to pass before any production tag (`INDEP_GIT_RULES`), with results logged to
+  `INDEP_TEST_RESULTS`.
+- `DOCS/FEATURES.md` — single completed/pending feature reference.
+
+### Changed
+- Nightly Fact-Check scoped to `MAIN_` topics only (was: every topic) and rescheduled
+  03:00 -> 06:00; installed as an active, enabled native systemd timer.
+- `INDEP_GIT_RULES`: production tags now require a passing test-suite run first, and repo
+  visibility policy made explicit (primary repo private on every host; any public presence is a
+  separate sanitized fork, never a visibility flip on the real repo).
+
+### Fixed
+- `search()`'s excerpt was always a file's first 1500 characters regardless of where the actual
+  match was, so a hit deep in a long document could return a preview that never contained the
+  matched term. Centered the excerpt on the match in both `api_app.py` and the CLI's own preview
+  truncation (`SKILLS/cli/wiki_search.py`), which had the same bug one level down.
+
 ## [0.1.0] - 2026-08-05
 
 ### Added
