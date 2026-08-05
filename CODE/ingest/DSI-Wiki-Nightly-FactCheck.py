@@ -1,10 +1,14 @@
-"""Nightly fact-check: a small tool-calling local model verifies every wiki topic's
+"""Nightly fact-check: a small tool-calling local model verifies every MAIN_ wiki topic's
 documentation layer against live system state. Any false claim found is deleted from
 the document outright and archived (with its correction) into that topic's
 'silinmişler' (deleted) sub-topic file — no more inline ~~strikethrough~~ (2026-07-30).
 
-Runs unattended at 03:00 via systemd timer. Bonsai gets a small, read-only, whitelisted toolset
-(no shell=True, no writes, no path escape outside /home/ozan) so it can check its own facts
+Scoped to MAIN_ topics only (2026-08-05): those are the consolidated, project-level pages
+that actually make concrete/checkable claims about live system state; SUB_/INDEP_ topics are
+narrower notes not worth the per-topic model-call budget here.
+
+Runs unattended at 06:00 via systemd timer. Bonsai gets a small, read-only, whitelisted toolset
+(no shell=True, no writes, no path escape outside SAFE_ROOT) so it can check its own facts
 instead of the orchestrator gathering ground truth by hand every time.
 """
 import json
@@ -343,7 +347,7 @@ def main():
         doc_dir = base_dir / "documentation"
         if not doc_dir.is_dir():
             continue
-        for doc_path in sorted(doc_dir.glob("*.md")):
+        for doc_path in sorted(doc_dir.glob("MAIN_*.md")):
             topic = doc_path.stem
             if topic in SKIP_TOPICS or topic.startswith("OBSOLETE_"):
                 continue
