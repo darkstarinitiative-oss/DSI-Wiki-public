@@ -54,9 +54,22 @@ services:
   gateway:
     <<: *common
     command: ["python3", "CODE/gateway/DSI-Wiki-HTTP-Server.py"]
+    environment:
+      # Repeats x-common's vars -- a service-level `environment:` replaces the
+      # anchor's block wholesale rather than merging into it (see `ingest`, which
+      # does the same). LLM_WIKI_RAW_DIR is new here: the /http/dashboard "add
+      # topic" widget writes new raw notes directly (same input channel a human
+      # dropping a file into raw/ would use), so gateway needs it read-write too.
+      LLM_WIKI_OLLAMA_URL: ${LLM_WIKI_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
+      LLM_WIKI_OLLAMA_MODEL: ${LLM_WIKI_OLLAMA_MODEL:-qwen3:4b}
+      LLM_WIKI_RAW_DIR: /data/raw
+      WIKI_BASE_DIR: /data/base
+      INSTANCES_DIR: /app/JSONS/instances
+      WIKI_STATUS_PATH: /data/status/STATUS.json
     ports:
       - "${SERVICE_PORT:-8430}:8430"
     volumes:
+      - ${WIKI_RAW_DIR:?set WIKI_RAW_DIR in .env}:/data/raw
       - ${WIKI_BASE_DIR:?set WIKI_BASE_DIR in .env}:/data/base:ro
       - wiki-status:/data/status:ro
 

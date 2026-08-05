@@ -40,6 +40,12 @@ def _git_commit() -> str | None:
         return None
 
 
+# Updated by process_file() right when a run finishes (success or failure) --
+# read by write_status() so the health widget (CODE/ui/DSI-Wiki-UI-Server.py)
+# can show "last ingest" without waiting for the next poll-cycle snapshot.
+_last_ingest = {"topic": None, "finished_at": None, "duration_seconds": None, "ok": None}
+
+
 def write_status(instances_loaded: int):
     status = {
         "service": "dsi-wiki-ingest",
@@ -48,6 +54,7 @@ def write_status(instances_loaded: int):
         "ollama_model": OLLAMA_MODEL,
         "service_version": SERVICE_VERSION,
         "git_commit": _git_commit(),
+        "last_ingest": _last_ingest,
     }
     try:
         STATUS_PATH.write_text(json.dumps(status, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -372,8 +379,16 @@ def regenerate_consolidated_layers(main_topic: str, base_dir: Path, layers_cfg: 
     log(f"   >> consolidated {list(parsed.keys())} written for: {main_topic} (from {len(sources)} source page(s))")
 
 
+def _record_ingest_result(topic: str, started_at: float, ok: bool):
+    _last_ingest["topic"] = topic
+    _last_ingest["finished_at"] = datetime.now(timezone.utc).isoformat()
+    _last_ingest["duration_seconds"] = round(time.time() - started_at, 1)
+    _last_ingest["ok"] = ok
+
+
 def process_file(raw_path: Path):
     topic = raw_path.stem
+    started_at = time.time()
     log(f"-> Processing: {raw_path.name} (topic={topic})")
 
     route = match_route(topic)
@@ -400,23 +415,28 @@ def process_file(raw_path: Path):
         result = run_llm(prompt, timeout=CLAUDE_TIMEOUT)
     except TimeoutError:
         log(f"   !! Timed out after {CLAUDE_TIMEOUT}s — skipping.")
+        _record_ingest_result(topic, started_at, ok=False)
         return
     except ConnectionError as e:
         log(f"   !! {e}")
+        _record_ingest_result(topic, started_at, ok=False)
         return
 
     if result.returncode != 0:
         log(f"   !! bonsai error: {result.stderr[:300]}")
+        _record_ingest_result(topic, started_at, ok=False)
         return
 
     parsed = parse_output(result.stdout, layer_names)
     if parsed is None:
         log("   !! Delimiter markers missing in bonsai output.")
         log(f"      First 400 chars: {result.stdout[:400]}")
+        _record_ingest_result(topic, started_at, ok=False)
         return
 
     write_layers(topic, parsed, file_layers_cfg, base_dir)
     log(f"   >> {len(parsed)} layers written for: {topic} (base_dir={base_dir}, layers={list(parsed.keys())})")
+    _record_ingest_result(topic, started_at, ok=True)
 
     if consolidate:
         regenerate_consolidated_layers(main_topic, base_dir, layers_cfg, route_rules)

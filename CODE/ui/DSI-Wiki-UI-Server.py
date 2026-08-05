@@ -6,7 +6,10 @@ single-instance socketserver-based UI, which hardcoded ~/LLM-Wiki-BASE and port 
 """
 import json
 import os
+import re
 import sys
+import urllib.error
+import urllib.request
 
 from starlette.applications import Starlette
 from starlette.responses import HTMLResponse, JSONResponse
@@ -16,6 +19,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from api_app import load_instances, get_content  # noqa: E402
 
 LAYERS = ("documentation", "llm", "minified")
+
+# --- /dashboard support (health + create-topic widgets) ---------------------
+STATUS_PATH = os.environ.get(
+    "WIKI_STATUS_PATH",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "STATUS.json"),
+)
+RAW_DIR = os.environ.get("LLM_WIKI_RAW_DIR")
+# Ollama's own chat endpoint URL, minus the /api/chat suffix, to reach /api/ps.
+_OLLAMA_CHAT_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://host.docker.internal:11434/api/chat")
+OLLAMA_BASE = _OLLAMA_CHAT_URL.rsplit("/api/", 1)[0]
+TOPIC_RE = re.compile(r"^(MAIN|SUB|INDEP)_[A-Za-z0-9_-]+$")
 
 
 def _visible_topics_path(base_dir):
@@ -260,8 +274,175 @@ fetchInstances();
 """
 
 
+DASHBOARD_HTML = f"""<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSI-Wiki Dashboard</title>
+<link rel="stylesheet" href="{THEME_URL}">
+<style>
+  body {{ padding: 2rem; }}
+  .card {{ margin-bottom: 1.5rem; }}
+  .stat-label {{ color: var(--bs-secondary-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }}
+  .stat-value {{ font-size: 1.05rem; }}
+  #topic-list-w2 {{ max-height: 260px; overflow-y: auto; }}
+  #topic-list-w2 .list-group-item {{ font-size: 0.85rem; }}
+</style>
+</head>
+<body>
+<div class="container" style="max-width: 900px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">DSI-Wiki Dashboard <small class="text-secondary fs-6">(test page)</small></h3>
+    <div style="min-width: 220px;">
+      <select id="instance" class="form-select form-select-sm"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      Health
+      <span id="health-refreshed" class="text-secondary" style="font-size:0.75rem;"></span>
+    </div>
+    <div class="card-body">
+      <div class="row row-cols-2 row-cols-md-4 g-3" id="health-grid"></div>
+      <hr>
+      <div class="stat-label">GPU (Ollama /api/ps)</div>
+      <div id="gpu-info" class="stat-value">loading...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Main topics</div>
+    <div class="card-body">
+      <div id="topic-list-w2" class="list-group mb-3"></div>
+      <form id="create-form" class="row g-2 align-items-start">
+        <div class="col-12 col-md-4">
+          <input id="new-topic-name" class="form-control form-control-sm" placeholder="MAIN_YourTopic / SUB_Main_Sub / INDEP_Topic" required>
+        </div>
+        <div class="col-12 col-md-6">
+          <textarea id="new-topic-content" class="form-control form-control-sm" rows="2" placeholder="raw note content (optional)"></textarea>
+        </div>
+        <div class="col-12 col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">Add topic</button>
+        </div>
+      </form>
+      <div id="create-result" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentInstance = null;
+
+function fetchInstances() {{
+  fetch('api/instances').then(r => r.json()).then(data => {{
+    const sel = document.getElementById('instance');
+    sel.innerHTML = '';
+    data.instances.forEach(name => {{
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    }});
+    currentInstance = data.default || data.instances[0];
+    sel.value = currentInstance;
+    refreshTopics();
+  }});
+}}
+
+function statCol(label, value) {{
+  return `<div class="col"><div class="stat-label">${{label}}</div><div class="stat-value">${{value}}</div></div>`;
+}}
+
+function timeAgo(iso) {{
+  if (!iso) return 'never';
+  const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.round(secs / 60) + 'm ago';
+  return Math.round(secs / 3600) + 'h ago';
+}}
+
+function refreshHealth() {{
+  fetch('api/health').then(r => r.json()).then(data => {{
+    const s = data.status || {{}};
+    const li = s.last_ingest || {{}};
+    const grid = document.getElementById('health-grid');
+    grid.innerHTML = [
+      statCol('Ingest last poll', timeAgo(s.last_poll_ts)),
+      statCol('Raw queue', data.raw_queue_count === null ? 'n/a' : data.raw_queue_count + ' file(s)'),
+      statCol('Ollama model', s.ollama_model || 'n/a'),
+      statCol('Service version', (s.service_version || 'n/a') + (s.git_commit ? ' @' + s.git_commit : '')),
+      statCol('Last ingest topic', li.topic || 'n/a'),
+      statCol('Last ingest result', li.ok === true ? '<span class="badge text-bg-success">ok</span>' : (li.ok === false ? '<span class="badge text-bg-danger">failed</span>' : 'n/a')),
+      statCol('Last ingest finished', timeAgo(li.finished_at)),
+      statCol('Last ingest duration', li.duration_seconds != null ? li.duration_seconds + 's' : 'n/a'),
+    ].join('');
+    const gpu = data.gpu || {{}};
+    const gpuEl = document.getElementById('gpu-info');
+    if (!gpu.reachable) {{
+      gpuEl.innerHTML = '<span class="badge text-bg-secondary">Ollama unreachable</span> ' + (gpu.error || '');
+    }} else if (!gpu.models || !gpu.models.length) {{
+      gpuEl.innerHTML = '<span class="badge text-bg-secondary">no model currently loaded</span>';
+    }} else {{
+      gpuEl.innerHTML = gpu.models.map(m =>
+        `<span class="badge text-bg-info me-2">${{m.name}}: ${{m.gpu_percent == null ? '?' : m.gpu_percent + '%'}} GPU</span>`
+      ).join('');
+    }}
+    document.getElementById('health-refreshed').textContent = 'refreshed ' + new Date().toLocaleTimeString();
+  }});
+}}
+
+function refreshTopics() {{
+  fetch(`api/all_topics?instance=${{encodeURIComponent(currentInstance)}}`).then(r => r.json()).then(data => {{
+    const mains = (data.topics || []).filter(t => t.startsWith('MAIN_')).sort();
+    const el = document.getElementById('topic-list-w2');
+    el.innerHTML = mains.length
+      ? mains.map(t => `<div class="list-group-item bg-transparent">${{t}}</div>`).join('')
+      : '<div class="text-secondary small">No MAIN_ topics yet for this instance.</div>';
+  }});
+}}
+
+document.getElementById('instance').addEventListener('change', e => {{
+  currentInstance = e.target.value;
+  refreshTopics();
+}});
+
+document.getElementById('create-form').addEventListener('submit', e => {{
+  e.preventDefault();
+  const topic = document.getElementById('new-topic-name').value.trim();
+  const content = document.getElementById('new-topic-content').value;
+  const resultEl = document.getElementById('create-result');
+  resultEl.innerHTML = '';
+  fetch('api/create_topic', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{topic, content}})
+  }}).then(r => r.json().then(data => ({{ok: r.ok, data}}))).then(({{ok, data}}) => {{
+    if (ok) {{
+      resultEl.innerHTML = `<div class="alert alert-success py-1 px-2 mb-0">Created ${{data.created}}.md in raw/ -- will appear here once ingest picks it up.</div>`;
+      document.getElementById('new-topic-name').value = '';
+      document.getElementById('new-topic-content').value = '';
+    }} else {{
+      resultEl.innerHTML = `<div class="alert alert-danger py-1 px-2 mb-0">${{data.error}}</div>`;
+    }}
+  }});
+}});
+
+fetchInstances();
+refreshHealth();
+setInterval(refreshHealth, 10000);
+</script>
+</body>
+</html>
+"""
+
+
 async def index(request):
     return HTMLResponse(HTML)
+
+
+async def dashboard(request):
+    return HTMLResponse(DASHBOARD_HTML)
 
 
 async def api_instances(request):
@@ -314,14 +495,83 @@ async def api_pin(request):
     return JSONResponse({"pinned": sorted(current)})
 
 
+def _read_status():
+    if not os.path.isfile(STATUS_PATH):
+        return {"error": "STATUS.json not yet written (ingest daemon not running?)"}
+    try:
+        with open(STATUS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        return {"error": str(e)}
+
+
+def _raw_queue_count():
+    if not RAW_DIR or not os.path.isdir(RAW_DIR):
+        return None
+    return len([f for f in os.listdir(RAW_DIR) if f.endswith(".md")])
+
+
+def _gpu_status():
+    """Live snapshot from Ollama's own /api/ps -- loaded models and how much of
+    each sits in VRAM vs. spilled to CPU. Best-effort: Ollama being unreachable
+    is a normal, reportable state here, not an error worth failing the request."""
+    try:
+        with urllib.request.urlopen(f"{OLLAMA_BASE}/api/ps", timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        return {"reachable": False, "error": str(e)}
+    models = []
+    for m in data.get("models", []):
+        size = m.get("size") or 0
+        size_vram = m.get("size_vram") or 0
+        models.append({
+            "name": m.get("name"),
+            "gpu_percent": round(size_vram / size * 100) if size else None,
+            "expires_at": m.get("expires_at"),
+        })
+    return {"reachable": True, "models": models}
+
+
+async def api_health(request):
+    return JSONResponse({
+        "status": _read_status(),
+        "raw_queue_count": _raw_queue_count(),
+        "gpu": _gpu_status(),
+    })
+
+
+async def api_create_topic(request):
+    if not RAW_DIR:
+        return JSONResponse({"error": "LLM_WIKI_RAW_DIR not configured on this gateway"}, status_code=500)
+    body = await request.json()
+    topic = (body.get("topic") or "").strip()
+    content = body.get("content") or ""
+    if not TOPIC_RE.match(topic):
+        return JSONResponse(
+            {"error": "topic must match MAIN_<slug> / SUB_<main>_<slug> / INDEP_<slug> (letters, digits, _, -)"},
+            status_code=400,
+        )
+    os.makedirs(RAW_DIR, exist_ok=True)
+    path = os.path.join(RAW_DIR, f"{topic}.md")
+    if os.path.exists(path):
+        return JSONResponse({"error": f"{topic}.md already exists in raw/ (still pending, or a name collision)"}, status_code=409)
+    body_text = content.strip() or f"# {topic}\n"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(body_text)
+    return JSONResponse({"created": topic, "path": path})
+
+
 def build_app(scan_dir):
     app = Starlette(routes=[
         Route("/", index),
+        Route("/dashboard", dashboard),
         Route("/api/instances", api_instances),
         Route("/api/topics", api_topics),
         Route("/api/all_topics", api_all_topics),
         Route("/api/content", api_content),
         Route("/api/pin", api_pin, methods=["POST"]),
+        Route("/api/health", api_health),
+        Route("/api/create_topic", api_create_topic, methods=["POST"]),
     ])
     app.state.scan_dir = scan_dir
     return app

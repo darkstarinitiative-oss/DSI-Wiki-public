@@ -138,6 +138,10 @@ curl -sS http://localhost:8430/api/status         # live status once ingest has 
 curl -sS "http://localhost:8430/api/topics?instance=Cain-the-elder"   # {"topics":[]} before any real ingest
 ```
 
+Or just open `http://localhost:8430/http/dashboard` in a browser — the Health widget shows the
+same status live (services, raw-note queue depth, last-ingest timing, GPU), and the topic widget
+lets you create a `MAIN_`/`SUB_`/`INDEP_` topic without touching a terminal.
+
 ## 6. Real ingest test (needs working Ollama connectivity from step 1)
 
 Drop a real note into the configured `WIKI_RAW_DIR` — a topic name without `ihalemobil`/`witch`

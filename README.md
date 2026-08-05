@@ -108,6 +108,11 @@ since `gateway`'s `WIKI_BASE_DIR` mount is read-only.)
 `GET /api/topics?instance=&layer=`, `GET /api/wiki?instance=&topic=&layer=`,
 `GET /api/search?instance=&q=&layer=`, `GET /api/status`; MCP at `/mcp` with the same three tools.
 
+**Browsable UI:** `/http` — the main wiki browser, and `/http/dashboard`, a widgets test page
+with a live health panel (services, raw-note queue depth, last-ingest timing, GPU snapshot via
+Ollama's own `/api/ps`) and a MAIN_ topic list + create-topic form (writes a new raw note into
+`raw/`, same input path as dropping a file there by hand).
+
 **Add an instance:** new JSON under `JSONS/instances/`, then re-run the supervisor.
 
 ## Branches
