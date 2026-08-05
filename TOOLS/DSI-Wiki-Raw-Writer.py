@@ -8,12 +8,15 @@ write a `<topic>.md` file into the raw/ inbox. The already-running
 minified layers via Bonsai, and archives the note. No `hermes`, no LLM call,
 no per-note process spawn happens here.
 
-Inbox resolution (first hit wins) — so the writer always sees the SAME raw dir
-the ingest service actually uses, instead of a hardcoded guess:
+Inbox resolution (first hit wins) — no hardcoded fallback, since guessing a path is how a note
+silently lands in the wrong place:
   1. --raw-dir argument
-  2. $LLM_WIKI_RAW_DIR
-  3. LLM_WIKI_RAW_DIR from the ingest service's EnvironmentFile
-  4. hard fallback: /home/ozan/CLEANUP/DATA/Wiki-RAW
+  2. $WIKI_RAW_DIR (the same var name `SERVICES/.env` uses for the Docker deployment)
+
+This script runs on the bare host, not inside a container, so it never sees the
+container-internal `LLM_WIKI_RAW_DIR` docker-compose.yml injects for the ingest service itself —
+export the real value into your shell first:
+  set -a; source SERVICES/.env; set +a
 
 Routing: the ingest service routes a note to an instance by matching a route
 keyword contained in the topic name; a topic with no keyword lands in the
@@ -33,36 +36,22 @@ import sys
 import tempfile
 from pathlib import Path
 
-INGEST_ENV_FILE = Path(__file__).resolve().parent.parent / "CODE" / "ingest" / ".env"
-FALLBACK_RAW_DIR = Path(os.environ.get("WIKI_RAW_DIR", "/home/ozan/CLEANUP/DATA/Wiki-RAW"))
-
 # A topic becomes a filename stem, so keep it to safe characters only.
 _VALID_TOPIC = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
-def _raw_dir_from_env_file(env_file: Path) -> str | None:
-    """Read LLM_WIKI_RAW_DIR out of a KEY=VALUE env file, if present."""
-    try:
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line.startswith("LLM_WIKI_RAW_DIR="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except OSError:
-        pass
-    return None
-
-
 def resolve_raw_dir(cli_value: str | None) -> Path:
-    """Resolve the raw inbox, preferring explicit config over the fallback."""
+    """Resolve the raw inbox: explicit arg, else $WIKI_RAW_DIR. No hardcoded fallback — a wrong
+    guess means the note silently lands somewhere the ingest service never looks."""
     if cli_value:
         return Path(cli_value).expanduser()
-    env_value = os.environ.get("LLM_WIKI_RAW_DIR")
+    env_value = os.environ.get("WIKI_RAW_DIR")
     if env_value:
         return Path(env_value).expanduser()
-    file_value = _raw_dir_from_env_file(INGEST_ENV_FILE)
-    if file_value:
-        return Path(file_value).expanduser()
-    return FALLBACK_RAW_DIR
+    raise ValueError(
+        "No raw dir configured: pass --raw-dir, or export WIKI_RAW_DIR "
+        "(e.g. `set -a; source SERVICES/.env; set +a`)."
+    )
 
 
 def validate_topic(topic: str) -> str:
@@ -122,7 +111,7 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--content", help="Note body as a string")
     group.add_argument("--content-file", help="Read note body from this file")
-    parser.add_argument("--raw-dir", help="Override the inbox directory (else env / service .env)")
+    parser.add_argument("--raw-dir", help="Override the inbox directory (else $WIKI_RAW_DIR)")
     args = parser.parse_args()
 
     try:
