@@ -392,6 +392,9 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
     <div class="card-body">
       <div class="row row-cols-2 row-cols-md-4 g-3" id="health-grid"></div>
       <hr>
+      <div class="stat-label">Services</div>
+      <div id="services-info" class="stat-value">loading...</div>
+      <hr>
       <div class="stat-label">GPU (Ollama /api/ps)</div>
       <div id="gpu-info" class="stat-value">loading...</div>
     </div>
@@ -462,6 +465,14 @@ function refreshHealth() {{
       statCol('Last ingest finished', timeAgo(li.finished_at)),
       statCol('Last ingest duration', li.duration_seconds != null ? li.duration_seconds + 's' : 'n/a'),
     ].join('');
+    const servicesEl = document.getElementById('services-info');
+    const services = s.services || [];
+    servicesEl.innerHTML = services.length
+      ? services.map(svc => {{
+          const badge = svc.status === 'ok' ? 'text-bg-success' : (svc.status === 'error' ? 'text-bg-danger' : 'text-bg-warning');
+          return `<span class="badge ${{badge}} me-2">${{svc.name}}: ${{svc.status}}</span>`;
+        }}).join('')
+      : '<span class="badge text-bg-secondary">no services reported</span>';
     const gpu = data.gpu || {{}};
     const gpuEl = document.getElementById('gpu-info');
     if (!gpu.reachable) {{
