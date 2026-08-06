@@ -89,6 +89,7 @@ services:
       WIKI_BASE_DIR: /data/base
       INSTANCES_DIR: /app/JSONS/instances
       WIKI_STATUS_PATH: /data/status/STATUS.json
+      SHARED_WIDGETS_DIR: /data/shared-widgets
     ports:
       - "${SERVICE_PORT:-8430}:8430"
     volumes:
@@ -97,6 +98,9 @@ services:
       - wiki-status:/data/status:ro
       - ../JSONS/instances:/app/JSONS/instances:ro
       - ../JSONS/DSI-Wiki-HTTP-Config.json:/app/JSONS/DSI-Wiki-HTTP-Config.json:ro
+      # service-widget.js: one shared file, authored in DSI-BEHOLDER's own repo, bind-mounted
+      # here too rather than duplicated -- see /http/dashboard's Services widget.
+      - ${SHARED_WIDGETS_DIR:-/BIG/_COMMON/dsi-widgets}:/data/shared-widgets:ro
 
 volumes:
   wiki-status:

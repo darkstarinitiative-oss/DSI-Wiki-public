@@ -13,7 +13,12 @@ import urllib.request
 
 from starlette.applications import Starlette
 from starlette.responses import HTMLResponse, JSONResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
+
+# service-widget.js: one shared file, bind-mounted here and into DSI-BEHOLDER (which is where
+# it's actually authored) rather than duplicated into this repo -- see docker-compose.yml.
+SHARED_WIDGETS_DIR = os.environ.get("SHARED_WIDGETS_DIR", "/data/shared-widgets")
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gateway"))
 from api_app import load_instances, get_content  # noqa: E402
@@ -374,6 +379,13 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
   #topic-list-w2 {{ max-height: 260px; overflow-y: auto; }}
   #topic-list-w2 .list-group-item {{ font-size: 0.85rem; }}
 </style>
+<!-- Shared with DSI-BEHOLDER's own dashboard -- see /BIG/_COMMON/dsi-widgets/service-widget.js.
+     KNOWN GAP (2026-08-06, not yet solved): Restart/Stop actually run via DSI-BEHOLDER's
+     /api/action/* (cross-origin from this page), which has no CORS headers configured yet --
+     so the buttons here currently render read-only (service list + health dot only, no
+     restart/stop, no last-action time) until that's wired up. Revisit before relying on this
+     page for anything but viewing status. -->
+<script src="static/service-widget.js"></script>
 </head>
 <body>
 <div class="container" style="max-width: 900px;">
@@ -393,7 +405,7 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
       <div class="row row-cols-2 row-cols-md-4 g-3" id="health-grid"></div>
       <hr>
       <div class="stat-label">Services</div>
-      <div id="services-info" class="stat-value">loading...</div>
+      <div id="services-widget-slot" class="stat-value"></div>
       <hr>
       <div class="stat-label">GPU (Ollama /api/ps)</div>
       <div id="gpu-info" class="stat-value">loading...</div>
@@ -465,14 +477,16 @@ function refreshHealth() {{
       statCol('Last ingest finished', timeAgo(li.finished_at)),
       statCol('Last ingest duration', li.duration_seconds != null ? li.duration_seconds + 's' : 'n/a'),
     ].join('');
-    const servicesEl = document.getElementById('services-info');
-    const services = s.services || [];
-    servicesEl.innerHTML = services.length
-      ? services.map(svc => {{
-          const badge = svc.status === 'ok' ? 'text-bg-success' : (svc.status === 'error' ? 'text-bg-danger' : 'text-bg-warning');
-          return `<span class="badge ${{badge}} me-2">${{svc.name}}: ${{svc.status}}</span>`;
-        }}).join('')
-      : '<span class="badge text-bg-secondary">no services reported</span>';
+    const svcSlot = document.getElementById('services-widget-slot');
+    svcSlot.innerHTML = '';
+    if (window.DSIServiceWidget) {{
+      // controlsBaseUrl points at DSI-BEHOLDER (the only container with docker.sock) --
+      // cross-origin, currently no CORS there yet, so this renders read-only for now (see
+      // the <script> comment at the top of this page's <head>).
+      DSIServiceWidget.renderProject(svcSlot, 'DSI-WIKI', s.services || [], {{
+        controlsBaseUrl: `${{location.protocol}}//${{location.hostname}}:9130`,
+      }});
+    }}
     const gpu = data.gpu || {{}};
     const gpuEl = document.getElementById('gpu-info');
     if (!gpu.reachable) {{
@@ -683,5 +697,7 @@ def build_app(scan_dir):
         Route("/api/health", api_health),
         Route("/api/create_topic", api_create_topic, methods=["POST"]),
     ])
+    if os.path.isdir(SHARED_WIDGETS_DIR):
+        app.routes.append(Mount("/static", StaticFiles(directory=SHARED_WIDGETS_DIR), name="static"))
     app.state.scan_dir = scan_dir
     return app
