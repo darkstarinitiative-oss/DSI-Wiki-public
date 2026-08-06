@@ -1,5 +1,0 @@
-{
-  "port": 8430,
-  "scan_dir": "/app/JSONS/instances",
-  "subdomain_routes": {}
-}

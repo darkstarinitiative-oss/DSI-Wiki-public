@@ -6,13 +6,28 @@ Sequence (each step gates the next):
   1. Free the GPU: whatever holds VRAM at 10:00 (the SDXL training if it is still
      running or has hung/crashed, plus any stuck Bonsai/hermes) is terminated and
      the Ollama model is unloaded, until VRAM is confirmed low.
-  2. Back up the wiki data dir (/home/user/CLEANUP/DATA) to a timestamped tarball.
+  2. Back up the wiki data dir (parent of Wiki-RAW/Wiki-BASE/Wiki-ARCHIVE/lock, wherever
+     SERVICES/.env points it) to a timestamped tarball.
   3. ONLY if the backup succeeded: create per-topic dispatcher tasks for every
      wiki topic (all MAIN_ and SUB_ pages) — each task runs fact_scan then
      fact_check. The freed GPU lets Bonsai do the fact-check pass.
 
 Self-removes its crontab line at the end so it runs exactly once.
-Logs to /home/user/CLEANUP/DATA/_morning_refresh.log
+Logs to $WIKI_BASE_DIR/../_morning_refresh.log (the shared parent of Wiki-RAW/Wiki-BASE/
+Wiki-ARCHIVE/lock -- there's no single "data dir" env var, see below).
+
+STATUS (2026-08-06): not currently scheduled (not present in `crontab -l`). Two separate
+staleness issues fixed/found here:
+  - The old `WIKI_DATA_DIR`-with-a-fallback env var this script used doesn't exist in the real
+    `SERVICES/.env` at all (that file defines `WIKI_RAW_DIR`/`WIKI_ARCHIVE_DIR`/`WIKI_BASE_DIR`/
+    `WIKI_LOCK_DIR` as independent siblings under one shared parent, not a single parent-dir
+    var) -- fixed to derive the shared parent from `WIKI_BASE_DIR` instead, since that's a real,
+    always-set variable.
+  - Step 3 (`create_tasks`) imports a `databases.dispatcher.db.DSIDatabase` module from a
+    hardcoded path that predates a since-restructured project layout and no longer exists --
+    that import will fail today. DSI-DISPATCHER-PLUSPLUS isn't wired into this deployment yet
+    either; re-point this at wherever that project's DB module actually lives before
+    re-enabling the cron job.
 """
 import os
 import re
@@ -23,11 +38,13 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, os.path.expanduser("~/READY/DSI-Database"))
-
-DATA_DIR = Path(os.environ.get("WIKI_DATA_DIR", "/home/user/CLEANUP/DATA"))
+if not os.environ.get("WIKI_BASE_DIR"):
+    raise SystemExit(
+        "error: WIKI_BASE_DIR is not set -- source SERVICES/.env first. No fallback path."
+    )
+DATA_DIR = Path(os.environ["WIKI_BASE_DIR"]).parent
 DOC_DIR = DATA_DIR / "Wiki-BASE" / "documentation"
-BACKUP_DIR = Path("/home/user/backups")
+BACKUP_DIR = Path(os.path.expanduser("~/backups"))
 LOG_FILE = DATA_DIR / "_morning_refresh.log"
 OLLAMA_MODEL = "hf.co/prism-ml/Bonsai-27B-gguf:Q1_0"
 TRAIN_MATCH = "sdxl_train_network.py"

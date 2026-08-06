@@ -15,10 +15,13 @@ COPY TOOLS/ TOOLS/
 COPY SKILLS/ SKILLS/
 COPY JSONS/ JSONS/
 
-# Container-specific instance + HTTP config (base_dir=/data/base, scan_dir=/app/JSONS/instances)
-# — the real, host-pathed JSONS/instances/*.json (gitignored) never enters the image.
-COPY SERVICES/instances.container/ JSONS/instances/
-COPY SERVICES/DSI-Wiki-HTTP-Config.container.json JSONS/DSI-Wiki-HTTP-Config.json
+# JSONS/instances/*.json and JSONS/DSI-Wiki-Multi-Server-Config.json/DSI-Wiki-HTTP-Config.json
+# are baked in here only as a fallback default (e.g. a bare `docker run` without compose) --
+# the real, live-editable copies are bind-mounted over these paths at runtime by
+# docker-compose.yml (2026-08-06: previously a SEPARATE, easy-to-forget SERVICES/*.container.json
+# set of files existed purely to hold container-correct values like base_dir=/data/base; that
+# whole class of "edited the host file, container silently kept running the old one" bug is
+# gone now that there's one file, bind-mounted, no build step in between).
 
 COPY SERVICES/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

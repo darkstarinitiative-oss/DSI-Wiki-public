@@ -2,8 +2,10 @@
 # dispatcher-run-t_* topic'lerini default-instance base_dir'inden arşive taşı (silme YOK, geri alınabilir).
 # Kullanım: archive_dispatcher_run_topics.sh [--dry-run]
 set -euo pipefail
-BASE=/home/user/CLEANUP/DATA/Wiki-BASE
-ARC=/home/user/CLEANUP/DATA/Wiki-ARCHIVE/dispatcher-run-topics
+: "${WIKI_BASE_DIR:?WIKI_BASE_DIR is not set -- source SERVICES/.env first (set -a; source SERVICES/.env; set +a). No fallback path.}"
+: "${WIKI_ARCHIVE_DIR:?WIKI_ARCHIVE_DIR is not set -- source SERVICES/.env first. No fallback path.}"
+BASE="$WIKI_BASE_DIR"
+ARC="$WIKI_ARCHIVE_DIR/dispatcher-run-topics"
 DRY=${1:-}
 moved=0
 for layer_dir in "$BASE"/*/; do

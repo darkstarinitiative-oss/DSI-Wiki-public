@@ -100,6 +100,20 @@ TESTS/      end-to-end smoke tests
 STATUS.json externally-readable health/control data (generated, gitignored)
 ```
 
+## Running host-side tools (Docker deployment)
+
+`TOOLS/` scripts like `DSI-Wiki-Raw-Writer.py` run on the bare host, not inside a container, so
+they never see the container-internal env vars `docker-compose.yml` injects for the services
+themselves. They read the plain names `SERVICES/.env` defines (`WIKI_RAW_DIR`,
+`WIKI_ARCHIVE_DIR`, `WIKI_BASE_DIR`, `WIKI_LOCK_DIR`) — export that file into your shell first:
+
+```
+set -a; source SERVICES/.env; set +a
+```
+
+No script auto-discovers this for you and there is no hardcoded fallback path — an unset var is
+a hard error, not a silent guess.
+
 ## Raw vs. base directories
 
 - **Raw is global** — one drop directory for the whole service (`WIKI_RAW_DIR` / `LLM_WIKI_RAW_DIR`);

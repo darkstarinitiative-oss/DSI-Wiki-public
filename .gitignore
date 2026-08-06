@@ -2,9 +2,11 @@
 __pycache__/
 *.pyc
 
-# Instance config'leri makineye özel gerçek path'ler içerir — sadece template commit'lenir.
-JSONS/instances/*.json
-!JSONS/instances/default.json
+# Instance configs used to hold machine-specific real host paths, so only the template was
+# committed -- no longer true (2026-08-06): base_dir is now the container-internal /data/base
+# path for every instance, and this file is bind-mounted straight into the container at
+# runtime (see docker-compose.yml) instead of being COPY'd/duplicated at build time. Tracked
+# in git now, not ignored.
 
 # generated output
 reports/

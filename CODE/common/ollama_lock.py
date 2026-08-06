@@ -26,7 +26,15 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-_LOCK_DIR = Path(os.environ.get("WIKI_LOCK_DIR", os.path.expanduser("~/CLEANUP/DATA")))
+_lock_dir_env = os.environ.get("WIKI_LOCK_DIR")
+if not _lock_dir_env:
+    raise RuntimeError(
+        "WIKI_LOCK_DIR is not set — source SERVICES/.env first (`set -a; source "
+        "SERVICES/.env; set +a`) before running this host-side. No fallback path: an "
+        "unset var is a hard error, not a silent guess (see README.md § Running "
+        "host-side tools)."
+    )
+_LOCK_DIR = Path(_lock_dir_env)
 LOCK_PATH = _LOCK_DIR / ".ollama_gpu.lock"
 STATE_PATH = _LOCK_DIR / ".ollama_gpu_queue.json"
 STATE_LOCK_PATH = _LOCK_DIR / ".ollama_gpu_queue.state.lock"
