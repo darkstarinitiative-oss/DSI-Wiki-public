@@ -77,8 +77,8 @@ else
   echo "| Backend: claude-code CLI round-trip | SKIP (claude CLI not on PATH) |"
 fi
 
-run "Health: gateway container running" "$(docker inspect -f '{{.State.Status}}' services-gateway-1 2>&1)" '^running$'
-run "Health: ingest container running" "$(docker inspect -f '{{.State.Status}}' services-ingest-1 2>&1)" '^running$'
+run "Health: gateway container running" "$(docker inspect -f '{{.State.Status}}' DSI-WIKI.docker.gateway 2>&1)" '^running$'
+run "Health: ingest container running" "$(docker inspect -f '{{.State.Status}}' DSI-WIKI.docker.ingest 2>&1)" '^running$'
 run "Health: ollama reachable" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:11434/api/tags)" '^200$'
 run "Health: cloudflared.service active" "$(systemctl is-active cloudflared 2>&1)" '^active$'
 run "Health: dsi-wiki-factcheck.timer active" "$(systemctl is-active dsi-wiki-factcheck.timer 2>&1)" '^active$'

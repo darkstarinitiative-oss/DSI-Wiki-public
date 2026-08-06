@@ -115,9 +115,9 @@ docker compose -f SERVICES/docker-compose.yml --env-file SERVICES/.env up -d --b
 docker compose -f SERVICES/docker-compose.yml --env-file SERVICES/.env ps
 ```
 
-Expect two containers (`services-gateway-1`, `services-ingest-1` — the leading `services-` is a
-Compose project-name quirk from the compose file living in `SERVICES/`, not a deploy target
-naming choice; harmless, not yet fixed).
+Expect two containers, `DSI-WIKI.docker.gateway` and `DSI-WIKI.docker.ingest` (host-wide naming
+convention: `DSI-<PROJECT>.docker.<service>` — identifies it as Docker, which project, and which
+service at a glance; see INDEP_DOCKER_RULES in the wiki).
 
 ## 5. Verify the package (no Ollama needed for this part)
 

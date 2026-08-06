@@ -11,6 +11,8 @@
 # `-f SERVICES/docker-compose.yml` from the repo root; pass `--env-file SERVICES/.env`
 # explicitly if you invoke it from elsewhere.)
 
+name: dsi-wiki
+
 x-common: &common
   build:
     context: ..
@@ -41,6 +43,7 @@ x-common: &common
 services:
   ingest:
     <<: *common
+    container_name: DSI-WIKI.docker.ingest
     command: ["python3", "CODE/ingest/DSI-Wiki-Ingest-Service-Class.py"]
     environment:
       LLM_WIKI_RAW_DIR: /data/raw
@@ -71,6 +74,7 @@ services:
 
   gateway:
     <<: *common
+    container_name: DSI-WIKI.docker.gateway
     command: ["python3", "CODE/gateway/DSI-Wiki-HTTP-Server.py"]
     environment:
       # Repeats x-common's vars -- a service-level `environment:` replaces the
