@@ -15,7 +15,7 @@
       "layers": {}
     }
   ],
-  "default_base_dir": "/home/ozan/CLEANUP/DATA/Wiki-BASE",
+  "default_base_dir": "/BIG/DATA/WIKI/Wiki-BASE",
   "default_layers": {
     "documentation": {
       "prompt": "Full markdown. Use ALL of these CORE sections, in order, every one present even if a section is just \"Not covered in raw source.\":\n1. Status\n2. Problem & Motivation\n3. TEC — Technical: architecture, file/directory structure, key classes/functions BY NAME, data flow, algorithms, running services/processes/ports. Name actual files and functions instead of summarizing them away — this is the section most likely to lose detail.\n4. Configuration — env vars, config files, ports, credential locations (never values)\n5. Usage — concrete examples\n6. Known Issues & Limitations\n7. Missing Information — anything the raw source didn't cover; use this instead of inventing content for a CORE section you don't have facts for.\nThen, ONLY if the raw source actually discusses them (by name, more than once), add matching CONDITIONAL sections — omit entirely otherwise, never add a placeholder for one: ART (visual/art assets, asset pipeline), API (exposed endpoints/contracts), DATA (database schema/data models), DEPLOYMENT (services, ports, infra), INTEGRATIONS (external dependencies)."

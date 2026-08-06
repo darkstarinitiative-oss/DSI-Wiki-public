@@ -58,6 +58,8 @@ write_read_proxy  DSI-wiki-topics        wiki_topics.py
 write_read_proxy  DSI-wiki-get           wiki_get.py
 write_read_proxy  DSI-wiki-search        wiki_search.py
 write_read_proxy  DSI-wiki-internal-scan internal_scan.py
+write_read_proxy  DSI-wiki-obsidian-link wiki_obsidian_link.py
+write_read_proxy  DSI-wiki-provenance    provenance.py
 write_write_proxy DSI-wiki-rename rename_topic 2 "DSI-wiki-rename <old-topic> <new-topic>"
 write_write_proxy DSI-wiki-delete delete_topic 1 "DSI-wiki-delete <topic>"
 
@@ -66,4 +68,4 @@ if ! grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null; then
     echo "Added ~/.local/bin to PATH in ~/.bashrc (open a new shell, or: source ~/.bashrc)"
 fi
 
-echo "Installed: DSI-wiki-topics, DSI-wiki-get, DSI-wiki-search, DSI-wiki-internal-scan, DSI-wiki-rename, DSI-wiki-delete -> $BIN_DIR"
+echo "Installed: DSI-wiki-topics, DSI-wiki-get, DSI-wiki-search, DSI-wiki-internal-scan, DSI-wiki-obsidian-link, DSI-wiki-provenance, DSI-wiki-rename, DSI-wiki-delete -> $BIN_DIR"

@@ -6,13 +6,30 @@ Sequence (each step gates the next):
   1. Free the GPU: whatever holds VRAM at 10:00 (the SDXL training if it is still
      running or has hung/crashed, plus any stuck Bonsai/hermes) is terminated and
      the Ollama model is unloaded, until VRAM is confirmed low.
-  2. Back up the wiki data dir (/home/ozan/CLEANUP/DATA) to a timestamped tarball.
+  2. Back up the wiki data dir (`/BIG/DATA/WIKI`, parent of Wiki-RAW/Wiki-BASE/
+     Wiki-ARCHIVE/lock) to a timestamped tarball.
   3. ONLY if the backup succeeded: create per-topic dispatcher tasks for every
      wiki topic (all MAIN_ and SUB_ pages) — each task runs fact_scan then
      fact_check. The freed GPU lets Bonsai do the fact-check pass.
 
 Self-removes its crontab line at the end so it runs exactly once.
-Logs to /home/ozan/CLEANUP/DATA/_morning_refresh.log
+Logs to $WIKI_BASE_DIR/../_morning_refresh.log (the shared parent of Wiki-RAW/Wiki-BASE/
+Wiki-ARCHIVE/lock -- there's no single "data dir" env var, see below).
+
+STATUS (2026-08-06): not currently scheduled (not present in crontab -l on this host). Two
+separate staleness issues fixed/found here:
+  - The old `WIKI_DATA_DIR`-with-a-`~/CLEANUP/DATA`-fallback env var this script used doesn't
+    exist in the real `SERVICES/.env` at all (that file defines `WIKI_RAW_DIR`/
+    `WIKI_ARCHIVE_DIR`/`WIKI_BASE_DIR`/`WIKI_LOCK_DIR` as independent siblings under
+    `/BIG/DATA/WIKI`, not a single parent dir) -- fixed to derive the shared parent from
+    `WIKI_BASE_DIR` instead, since that's a real, always-set variable.
+  - Step 3 (`create_tasks`) imports `databases.dispatcher.db.DSIDatabase` from a
+    `~/READY/DSI-Database` path that predates this host's `~/CLEANUP` -> `~/BASE` ->
+    `/BIG/PROJECTS/DSI` restructure and no longer exists -- that import will fail today.
+    DSI-DISPATCHER-PLUSPLUS itself isn't migrated onto this host yet either (see
+    DSI-LLM-ROUTER's MIGRATION_NOTES.md and the pending Dispatcher++ migration); re-point this
+    at wherever that project's DB module lands once it's migrated, before re-enabling the cron
+    job.
 """
 import os
 import re
@@ -23,9 +40,11 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, os.path.expanduser("~/READY/DSI-Database"))
-
-DATA_DIR = Path(os.environ.get("WIKI_DATA_DIR", "/home/ozan/CLEANUP/DATA"))
+if not os.environ.get("WIKI_BASE_DIR"):
+    raise SystemExit(
+        "error: WIKI_BASE_DIR is not set -- source SERVICES/.env first. No fallback path."
+    )
+DATA_DIR = Path(os.environ["WIKI_BASE_DIR"]).parent
 DOC_DIR = DATA_DIR / "Wiki-BASE" / "documentation"
 BACKUP_DIR = Path("/home/ozan/backups")
 LOG_FILE = DATA_DIR / "_morning_refresh.log"

@@ -35,7 +35,12 @@ from common.ollama_lock import call_ollama as _locked_call_ollama
 MODEL = "qwen3:1.7b"
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 INSTANCES_DIR = Path(os.environ.get("INSTANCES_DIR", str(REPO_ROOT / "JSONS" / "instances")))
-WIKI_BASE_DIR = os.environ.get("WIKI_BASE_DIR", "/home/ozan/CLEANUP/DATA/Wiki-BASE")
+if not os.environ.get("WIKI_BASE_DIR"):
+    raise RuntimeError(
+        "WIKI_BASE_DIR is not set — the systemd unit's EnvironmentFile= should already "
+        "provide this; if running by hand, source SERVICES/.env first. No fallback path."
+    )
+WIKI_BASE_DIR = os.environ["WIKI_BASE_DIR"]
 LOG_DIR = Path(WIKI_BASE_DIR) / "_nightly_factcheck_logs"
 # Read-only sandbox root for the whitelisted toolset below. Was a hardcoded
 # /home/ozan, which doesn't cover a deployment whose repo/data live under a

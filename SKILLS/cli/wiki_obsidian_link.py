@@ -14,7 +14,12 @@ import argparse
 import json
 import os
 
-WIKI_BASE_DIR = os.environ.get("WIKI_BASE_DIR", os.path.expanduser("~/CLEANUP/DATA/Wiki-BASE"))
+if not os.environ.get("WIKI_BASE_DIR"):
+    raise SystemExit(
+        "error: WIKI_BASE_DIR is not set — source SERVICES/.env first "
+        "(`set -a; source SERVICES/.env; set +a`). No fallback path."
+    )
+WIKI_BASE_DIR = os.environ["WIKI_BASE_DIR"]
 LINKS_PATH = os.path.join(WIKI_BASE_DIR, "_meta", "obsidian_links.json")
 
 
