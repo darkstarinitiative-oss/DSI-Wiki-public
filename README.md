@@ -9,7 +9,8 @@ web UI from a single gateway. One ingest daemon serves any number of wiki instan
 
 Full architecture: [`DOCS/architecture.md`](DOCS/architecture.md). Project layout and naming
 rules: [`DOCS/naming-conventions.md`](DOCS/naming-conventions.md). Prerequisites:
-[`Requires.md`](Requires.md).
+[`Requires.md`](Requires.md). Latest full audit (stale-path cleanup, live-tooling verification):
+[`DOCS/AUDIT-2026-08-06.md`](DOCS/AUDIT-2026-08-06.md).
 
 ## Setup
 
