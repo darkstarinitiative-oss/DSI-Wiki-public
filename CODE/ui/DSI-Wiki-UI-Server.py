@@ -597,12 +597,21 @@ async def api_pin(request):
 
 def _read_status():
     if not os.path.isfile(STATUS_PATH):
-        return {"error": "STATUS.json not yet written (ingest daemon not running?)"}
-    try:
-        with open(STATUS_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        return {"error": str(e)}
+        status = {"error": "STATUS.json not yet written (ingest daemon not running?)", "services": []}
+    else:
+        try:
+            with open(STATUS_PATH, encoding="utf-8") as f:
+                status = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            status = {"error": str(e), "services": []}
+    # STATUS.json is the ingest daemon's own self-report -- it has no idea the Gateway
+    # process exists. Append the Gateway's own live-computed entry the same way
+    # api_app.py's info_endpoint does (it's "ok" with a null heartbeat whenever it's
+    # answering a request at all, since it has no poll loop of its own).
+    status["services"] = list(status.get("services") or []) + [
+        {"name": "DSI-Wiki Gateway", "status": "ok", "last_heartbeat": None},
+    ]
+    return status
 
 
 def _raw_queue_count():
