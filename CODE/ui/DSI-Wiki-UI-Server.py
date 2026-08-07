@@ -482,11 +482,14 @@ function refreshHealth() {{
     const svcSlot = document.getElementById('services-widget-slot');
     svcSlot.innerHTML = '';
     if (window.DSIServiceWidget) {{
-      // '/http' -- same-origin, this gateway's own /api/controls|action_status|action/*
-      // (see api_controls_proxy et al.) proxy server-to-server to DSI-BEHOLDER. No CORS
-      // needed anywhere, the browser never leaves this origin.
-      DSIServiceWidget.renderProject(svcSlot, 'DSI-WIKI', s.services || [], {{
-        controlsBaseUrl: '/http',
+      // Enriched list (self-reported process status + container-level docker status, two
+      // separate rows each) comes from DSI-BEHOLDER via this gateway's own /api/services proxy
+      // -- not the bare s.services above, which only has the self-report. '/http' -- same-
+      // origin, /api/controls|action_status|action/* also proxy server-to-server. No CORS.
+      fetch('api/services').then(r => r.json()).then(svcData => {{
+        DSIServiceWidget.renderProject(svcSlot, 'DSI-WIKI', svcData.services || [], {{
+          controlsBaseUrl: '/http',
+        }});
       }});
     }}
     const gpu = data.gpu || {{}};
@@ -670,10 +673,27 @@ def _beholder_proxy_get(path):
     talks to this same-origin gateway. Beholder unreachable is a normal, reportable state, not
     a 500 (same spirit as _gpu_status above)."""
     try:
-        with urllib.request.urlopen(f"{BEHOLDER_BASE}{path}", timeout=5) as resp:
+        with urllib.request.urlopen(f"{BEHOLDER_BASE}{path}", timeout=15) as resp:
             return JSONResponse(json.loads(resp.read().decode("utf-8")))
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
         return JSONResponse({"error": f"DSI-BEHOLDER unreachable: {e}"}, status_code=502)
+
+
+async def api_services_proxy(request):
+    """Enriched services list for THIS project (self-reported process status, e.g. "DSI-Wiki
+    Gateway", PLUS container-level docker status, e.g. "DSI-WIKI.docker.gateway" -- two
+    independent signals, see DSI-BEHOLDER/checks.py's _docker_container_status) -- proxied from
+    DSI-BEHOLDER's /api/watchlist rather than this gateway's own bare /api/health, since only
+    Beholder (native, docker CLI on PATH) can see container-level status."""
+    try:
+        with urllib.request.urlopen(f"{BEHOLDER_BASE}/api/watchlist", timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        return JSONResponse({"services": [], "error": f"DSI-BEHOLDER unreachable: {e}"}, status_code=502)
+    for t in data.get("targets", []):
+        if t.get("name") == "DSI-WIKI":
+            return JSONResponse({"services": (t.get("info") or {}).get("services", [])})
+    return JSONResponse({"services": [], "error": "DSI-WIKI not found in DSI-BEHOLDER's watchlist"})
 
 
 async def api_controls_proxy(request):
@@ -730,6 +750,7 @@ def build_app(scan_dir):
         Route("/api/pin", api_pin, methods=["POST"]),
         Route("/api/health", api_health),
         Route("/api/create_topic", api_create_topic, methods=["POST"]),
+        Route("/api/services", api_services_proxy),
         Route("/api/controls", api_controls_proxy),
         Route("/api/action_status", api_action_status_proxy),
         Route("/api/action/{target}/{service}/{action}", api_action_proxy, methods=["POST"]),
