@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from starlette.applications import Starlette
@@ -35,6 +36,9 @@ RAW_DIR = os.environ.get("LLM_WIKI_RAW_DIR")
 _OLLAMA_CHAT_URL = os.environ.get("LLM_WIKI_OLLAMA_URL", "http://host.docker.internal:11434/api/chat")
 OLLAMA_BASE = _OLLAMA_CHAT_URL.rsplit("/api/", 1)[0]
 TOPIC_RE = re.compile(r"^(MAIN|SUB|INDEP)_[A-Za-z0-9_-]+$")
+# DSI-BEHOLDER runs natively on the host (not Docker) -- host.docker.internal is how this
+# container reaches it, same pattern as OLLAMA_BASE above.
+BEHOLDER_BASE = os.environ.get("BEHOLDER_URL", "http://host.docker.internal:9130")
 
 
 def _visible_topics_path(base_dir):
@@ -380,11 +384,9 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
   #topic-list-w2 .list-group-item {{ font-size: 0.85rem; }}
 </style>
 <!-- Shared with DSI-BEHOLDER's own dashboard -- see /BIG/_COMMON/dsi-widgets/service-widget.js.
-     KNOWN GAP (2026-08-06, not yet solved): Restart/Stop actually run via DSI-BEHOLDER's
-     /api/action/* (cross-origin from this page), which has no CORS headers configured yet --
-     so the buttons here currently render read-only (service list + health dot only, no
-     restart/stop, no last-action time) until that's wired up. Revisit before relying on this
-     page for anything but viewing status. -->
+     Restart/Stop route through this gateway's own /api/controls|action_status|action/* (see
+     api_controls_proxy et al.), which proxy server-to-server to DSI-BEHOLDER -- no CORS,
+     the browser stays same-origin the whole time. -->
 <script src="static/service-widget.js"></script>
 </head>
 <body>
@@ -480,11 +482,11 @@ function refreshHealth() {{
     const svcSlot = document.getElementById('services-widget-slot');
     svcSlot.innerHTML = '';
     if (window.DSIServiceWidget) {{
-      // controlsBaseUrl points at DSI-BEHOLDER (the only container with docker.sock) --
-      // cross-origin, currently no CORS there yet, so this renders read-only for now (see
-      // the <script> comment at the top of this page's <head>).
+      // '/http' -- same-origin, this gateway's own /api/controls|action_status|action/*
+      // (see api_controls_proxy et al.) proxy server-to-server to DSI-BEHOLDER. No CORS
+      // needed anywhere, the browser never leaves this origin.
       DSIServiceWidget.renderProject(svcSlot, 'DSI-WIKI', s.services || [], {{
-        controlsBaseUrl: `${{location.protocol}}//${{location.hostname}}:9130`,
+        controlsBaseUrl: '/http',
       }});
     }}
     const gpu = data.gpu || {{}};
@@ -663,6 +665,38 @@ async def api_health(request):
     })
 
 
+def _beholder_proxy_get(path):
+    """Server-to-server call to DSI-BEHOLDER -- no CORS needed anywhere, the browser only ever
+    talks to this same-origin gateway. Beholder unreachable is a normal, reportable state, not
+    a 500 (same spirit as _gpu_status above)."""
+    try:
+        with urllib.request.urlopen(f"{BEHOLDER_BASE}{path}", timeout=5) as resp:
+            return JSONResponse(json.loads(resp.read().decode("utf-8")))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        return JSONResponse({"error": f"DSI-BEHOLDER unreachable: {e}"}, status_code=502)
+
+
+async def api_controls_proxy(request):
+    return _beholder_proxy_get("/api/controls")
+
+
+async def api_action_status_proxy(request):
+    return _beholder_proxy_get("/api/action_status")
+
+
+async def api_action_proxy(request):
+    target, service, action = request.path_params["target"], request.path_params["service"], request.path_params["action"]
+    url = f"{BEHOLDER_BASE}/api/action/{urllib.parse.quote(target, safe='')}/{urllib.parse.quote(service, safe='')}/{action}"
+    try:
+        req = urllib.request.Request(url, method="POST")
+        with urllib.request.urlopen(req, timeout=35) as resp:
+            return JSONResponse(json.loads(resp.read().decode("utf-8")))
+    except urllib.error.HTTPError as e:
+        return JSONResponse(json.loads(e.read().decode("utf-8")), status_code=e.code)
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as e:
+        return JSONResponse({"error": f"DSI-BEHOLDER unreachable: {e}"}, status_code=502)
+
+
 async def api_create_topic(request):
     if not RAW_DIR:
         return JSONResponse({"error": "LLM_WIKI_RAW_DIR not configured on this gateway"}, status_code=500)
@@ -696,6 +730,9 @@ def build_app(scan_dir):
         Route("/api/pin", api_pin, methods=["POST"]),
         Route("/api/health", api_health),
         Route("/api/create_topic", api_create_topic, methods=["POST"]),
+        Route("/api/controls", api_controls_proxy),
+        Route("/api/action_status", api_action_status_proxy),
+        Route("/api/action/{target}/{service}/{action}", api_action_proxy, methods=["POST"]),
     ])
     if os.path.isdir(SHARED_WIDGETS_DIR):
         app.routes.append(Mount("/static", StaticFiles(directory=SHARED_WIDGETS_DIR), name="static"))
