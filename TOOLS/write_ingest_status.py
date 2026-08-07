@@ -22,6 +22,10 @@ CONTAINER = os.environ.get("WIKI_INGEST_CONTAINER", "DSI-WIKI.docker.ingest")
 STATUS_PATH = Path(os.environ.get("WIKI_STATUS_DIR", str(_REPO_ROOT / "DATA" / "status"))) / "STATUS.json"
 EVENTS_PATH = Path(os.environ.get("WIKI_INGEST_EVENTS_DIR", str(_REPO_ROOT / "DATA" / "events"))) / "ingest_events.json"
 SERVICE_VERSION = "0.1a"
+# How often the dashboard's JS should re-poll api/health -- read from this JSON, not hardcoded
+# client-side, so the cadence can change without touching CODE/ui. Matches this cron's own
+# once-a-minute tick by default (DOCS/info-api-standard.md).
+REFRESH_INTERVAL_SECONDS = int(os.environ.get("WIKI_UI_REFRESH_INTERVAL_SECONDS", "60"))
 
 
 def _container_state() -> tuple[str, str]:
@@ -78,6 +82,7 @@ def main() -> int:
         "git_commit": _git_commit(),
         "checked_at": now,
         "checked_by": "TOOLS/write_ingest_status.py (host cron)",
+        "refresh_interval_seconds": REFRESH_INTERVAL_SECONDS,
     }
 
     STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)

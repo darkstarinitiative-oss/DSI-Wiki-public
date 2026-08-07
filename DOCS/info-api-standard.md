@@ -22,7 +22,8 @@ endpoint and render it the same way, without project-specific code.
   "feed": [
     { "ts": "2026-08-05T00:22:47Z", "icon": "warning", "title": "Consolidation retry", "note": "MAIN_DSI-WIKI llm/minified/brief hit 300s timeout, retried and succeeded." },
     { "ts": "2026-08-04T23:30:53Z", "icon": "ok", "title": "MAIN_SYSTEM ingested", "note": "documentation + consolidation, 273s total." }
-  ]
+  ],
+  "refresh_interval_seconds": 60
 }
 ```
 
@@ -41,6 +42,7 @@ endpoint and render it the same way, without project-specific code.
 | `feed[].icon` | `"ok"` \| `"warning"` \| `"error"` \| `"info"` | yes | Fixed vocabulary — this is what lets a generic widget render an icon without project-specific mapping logic. |
 | `feed[].title` | string | yes | Short. |
 | `feed[].note` | string | yes (may be `""`) | Longer, optional detail. |
+| `refresh_interval_seconds` | integer | yes | How often a polling widget/dashboard should re-fetch this endpoint, in seconds. Lets the cadence change project-side without touching client JS. **Default 60 when a project has no opinion** — a widget that gets a response without this key (older project, not yet updated) should also fall back to 60, not fail. |
 
 All fields are required keys (use `null`/`""`/`[]` rather than omitting a key) — a generic
 renderer built against this standard shouldn't need per-field existence checks.

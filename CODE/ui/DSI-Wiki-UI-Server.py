@@ -389,6 +389,10 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
      api_controls_proxy et al.), which proxy server-to-server to DSI-BEHOLDER -- no CORS,
      the browser stays same-origin the whole time. -->
 <script src="static/service-widget.js"></script>
+<!-- Same shared-widgets mount, see /BIG/_COMMON/dsi-widgets/feed-widget.js. Single source today
+     (this project's own STATUS.json feed[]) but built to merge N sources' feed[] into one
+     time-sorted list, ready for whenever this page (or Beholder's) pulls in more than one. -->
+<script src="static/feed-widget.js"></script>
 </head>
 <body>
 <div class="container" style="max-width: 900px;">
@@ -409,6 +413,9 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
       <hr>
       <div class="stat-label">Services</div>
       <div id="services-widget-slot" class="stat-value"></div>
+      <hr>
+      <div class="stat-label">Feed</div>
+      <div id="feed-widget-slot" class="stat-value"></div>
       <hr>
       <div class="stat-label">GPU (Ollama /api/ps)</div>
       <div id="gpu-info" class="stat-value">loading...</div>
@@ -519,6 +526,10 @@ function refreshHealth() {{
         }});
       }});
     }}
+    const feedSlot = document.getElementById('feed-widget-slot');
+    if (window.DSIFeedWidget) {{
+      DSIFeedWidget.renderFeeds(feedSlot, [{{ project: 'DSI-WIKI', feed: s.feed || [] }}], {{ limit: 10 }});
+    }}
     const gpu = data.gpu || {{}};
     const gpuEl = document.getElementById('gpu-info');
     if (!gpu.reachable) {{
@@ -531,7 +542,18 @@ function refreshHealth() {{
       ).join('');
     }}
     document.getElementById('health-refreshed').textContent = 'refreshed ' + new Date().toLocaleTimeString();
-  }});
+    scheduleNextRefresh(s.refresh_interval_seconds);
+  }}).catch(() => scheduleNextRefresh());
+}}
+
+let refreshTimer = null;
+function scheduleNextRefresh(seconds) {{
+  // Interval comes from STATUS.json (refresh_interval_seconds, default 60s, see
+  // TOOLS/write_ingest_status.py) so the poll cadence can change without touching this page --
+  // self-rescheduling via setTimeout (not a fixed setInterval) so a slow request can't stack
+  // up a backlog of overlapping fetches.
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refreshHealth, (seconds || 60) * 1000);
 }}
 
 let allTopics = [];
@@ -638,7 +660,6 @@ document.getElementById('create-form').addEventListener('submit', e => {{
 
 fetchInstances();
 refreshHealth();
-setInterval(refreshHealth, 10000);
 </script>
 </body>
 </html>

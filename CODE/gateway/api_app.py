@@ -105,6 +105,7 @@ async def info_endpoint(request):
     status_path = _status_path()
     ingest_status, ingest_note, services, feed = "error", "STATUS.json not yet written (ingest daemon not running?)", [], []
     service_name, version = "dsi-wiki", "0.1a"
+    refresh_interval_seconds = 60
     if os.path.isfile(status_path):
         try:
             with open(status_path, encoding="utf-8") as f:
@@ -114,6 +115,7 @@ async def info_endpoint(request):
             services = raw.get("services", [])
             feed = raw.get("feed", [])
             version = raw.get("version", version)
+            refresh_interval_seconds = raw.get("refresh_interval_seconds", refresh_interval_seconds)
         except (OSError, json.JSONDecodeError) as e:
             ingest_status, ingest_note = "error", str(e)
 
@@ -127,6 +129,7 @@ async def info_endpoint(request):
         "status_note": ingest_note,
         "services": services,
         "feed": feed,
+        "refresh_interval_seconds": refresh_interval_seconds,
     })
 
 
