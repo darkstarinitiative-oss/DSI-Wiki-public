@@ -12,3 +12,5 @@ __pycache__/
 reports/
 *.bak
 /STATUS.json
+/DATA/status/
+/DATA/events/

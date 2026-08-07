@@ -27,24 +27,16 @@ from common.claude_code_backend import ClaudeCodeUnavailable, call_claude_code
 
 SERVICE_VERSION = "0.1a"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-STATUS_PATH = Path(os.environ.get("WIKI_STATUS_PATH", str(_REPO_ROOT / "STATUS.json")))
 
 
-def _git_commit() -> str | None:
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=str(_REPO_ROOT),
-            capture_output=True, text=True, timeout=5,
-        )
-        return result.stdout.strip() or None
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-# Updated by process_file() right when a run finishes (success or failure) --
-# read by write_status() so the health widget (CODE/ui/DSI-Wiki-UI-Server.py)
-# can show "last ingest" without waiting for the next poll-cycle snapshot.
+# Updated by process_file() right when a run finishes (success or failure), persisted to
+# EVENTS_PATH the same moment -- an event-driven write, once per completed ingest, not a
+# heartbeat loop. TOOLS/write_ingest_status.py (host-native, cron, every minute) reads this
+# to fill STATUS.json's "feed"/"last_ingest" fields; it independently determines whether the
+# daemon itself is alive (docker inspect) rather than trusting this file's freshness for that.
 _last_ingest = {"topic": None, "finished_at": None, "duration_seconds": None, "ok": None}
+
+EVENTS_PATH = Path(os.environ.get("WIKI_INGEST_EVENTS_PATH", str(_REPO_ROOT / "DATA" / "ingest_events.json")))
 
 # DSI Info API Standard (DOCS/info-api-standard.md): last _FEED_MAX events, newest
 # first. What counts as feed-worthy is this project's own call, per the standard --
@@ -61,43 +53,18 @@ def _push_feed(icon: str, title: str, note: str = ""):
         "note": note,
     })
     del _feed[_FEED_MAX:]
+    _write_events()
 
 
-def write_status(instances_loaded: int):
-    # DSI Info API Standard fields (service/version/status/status_note/services/feed)
-    # alongside the pre-existing ones (kept for anything already reading them).
-    ok = _last_ingest.get("ok")
-    if ok is False:
-        info_status, info_note = "warning", f"last ingest ({_last_ingest.get('topic')}) failed — see feed"
-    else:
-        info_status, info_note = "ok", "nominal"
-
-    status = {
-        "service": "dsi-wiki-ingest",
-        "version": SERVICE_VERSION,
-        "status": info_status,
-        "status_note": info_note,
-        "services": [
-            {
-                "name": "DSI-Wiki Ingest Daemon",
-                "status": info_status,
-                "last_heartbeat": datetime.now(timezone.utc).isoformat(),
-            },
-        ],
-        "feed": _feed,
-        # Pre-existing fields, kept for backward compatibility with anything already
-        # reading /api/status.
-        "last_poll_ts": datetime.now(timezone.utc).isoformat(),
-        "instances_loaded": instances_loaded,
-        "ollama_model": OLLAMA_MODEL,
-        "service_version": SERVICE_VERSION,
-        "git_commit": _git_commit(),
-        "last_ingest": _last_ingest,
-    }
+def _write_events():
     try:
-        STATUS_PATH.write_text(json.dumps(status, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+        EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = EVENTS_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"last_ingest": _last_ingest, "feed": _feed}, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(EVENTS_PATH)  # atomic
+    except OSError as e:
+        log(f"failed to write ingest events: {e}")
+
 
 # SIGUSR1 ile bekleme (time.sleep) anında kesilip kuyruk hemen işlenir.
 # Otomatik/klasör-tetikli değil — sadece elle (kill -USR1) çağrıldığında devreye girer.
@@ -519,7 +486,6 @@ def main():
     signal.signal(signal.SIGUSR1, _handle_wake_signal)
     log(f">> ingest_worker started | pid={os.getpid()} | raw={RAW_DIR} | poll={POLL_INTERVAL}s | "
         f"engine=bonsai-ollama:{OLLAMA_MODEL}:think={OLLAMA_THINK} | routes={len(routes)}")
-    write_status(len(routes))
 
     while True:
         load_routes()  # cache TTL'i (ROUTES_RELOAD_INTERVAL) dolmussa sessizce yeniler
@@ -530,7 +496,6 @@ def main():
                 process_file(f)
         else:
             log(">> Queue empty, waiting...")
-        write_status(len(_routes_cache.get("routes", [])))
         _wake_event.wait(timeout=POLL_INTERVAL)
         _wake_event.clear()
 

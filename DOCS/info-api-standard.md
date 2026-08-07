@@ -60,14 +60,19 @@ renderer built against this standard shouldn't need per-field existence checks.
 
 ## DSI-Wiki's own implementation
 
-DSI-Wiki's ingest daemon (`CODE/ingest/DSI-Wiki-Ingest-Service-Class.py`) already tracked
-per-topic ingest outcomes into `STATUS.json` (`_last_ingest`, added alongside the `/http/dashboard`
-health widget) — extended with a capped `feed` list (`_record_feed_entry()`, newest first, oldest
-dropped past 10) and a `services[]` block (Ingest Daemon's heartbeat = `last_poll_ts`; Gateway has
-no loop of its own, so its `last_heartbeat` is `null` and its `status` is inferred at request time
-from whether it's answering at all). Served at `GET /api/info` (`CODE/gateway/api_app.py`) — a
-new endpoint, chosen instead of reshaping the existing `/api/status` passthrough so nothing that
-already reads `/api/status` breaks.
+`STATUS.json` is no longer self-written by the ingest daemon (2026-08-07): a process that hangs
+or dies can't report its own hang/death, so it stopped trying to. The daemon
+(`CODE/ingest/DSI-Wiki-Ingest-Service-Class.py`) only persists *content* now — per-topic outcomes
+into `DATA/events/ingest_events.json` (`_write_events()`, atomic tmp+rename, called once per
+completed ingest, not on a heartbeat loop) — while `TOOLS/write_ingest_status.py` (host cron,
+every minute, outside any container) judges the daemon's actual up/down state via
+`docker inspect DSI-WIKI.docker.ingest` and combines it with that event data into `STATUS.json`
+(also atomic tmp+rename). Gateway has no loop of its own either, so its own `services[]` entry is
+still computed live at request time (`status` = "ok" whenever it's answering at all,
+`last_heartbeat` = `null`) — that one's fine self-reported, since the request only exists because
+the process is currently alive to answer it. Served at `GET /api/info`
+(`CODE/gateway/api_app.py`) — a new endpoint, chosen instead of reshaping the existing
+`/api/status` passthrough so nothing that already reads `/api/status` breaks.
 
 ## Generic info-viewer test page
 

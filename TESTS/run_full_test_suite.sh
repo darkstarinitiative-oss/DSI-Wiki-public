@@ -25,7 +25,7 @@ run "API GET /api/instances" "$(curl -sS --max-time 8 http://localhost:8430/api/
 run "API GET /api/topics" "$(curl -sS --max-time 8 "http://localhost:8430/api/topics?instance=$INSTANCE&layer=minified")" 'MAIN_'
 run "API GET /api/wiki" "$(curl -sS --max-time 8 "http://localhost:8430/api/wiki?instance=$INSTANCE&topic=MAIN_SYSTEM&layer=brief")" '"content"'
 run "API GET /api/search" "$(curl -sS --max-time 8 "http://localhost:8430/api/search?instance=$INSTANCE&q=DSI-Wiki&layer=documentation")" '"results"'
-run "API GET /api/status" "$(curl -sS --max-time 8 http://localhost:8430/api/status)" '"last_poll_ts"'
+run "API GET /api/status" "$(curl -sS --max-time 8 http://localhost:8430/api/status)" '"checked_at"'
 run "API GET /api/info" "$(curl -sS --max-time 8 http://localhost:8430/api/info)" '"status"'
 run "HTTP /http/dashboard" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 http://localhost:8430/http/dashboard)" '^200$'
 run "HTTP /http/info-viewer" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 http://localhost:8430/http/info-viewer)" '^200$'

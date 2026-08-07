@@ -38,7 +38,6 @@ x-common: &common
     LLM_WIKI_BACKEND: ${LLM_WIKI_BACKEND:-ollama}
     WIKI_BASE_DIR: /data/base
     INSTANCES_DIR: /app/JSONS/instances
-    WIKI_STATUS_PATH: /data/status/STATUS.json
 
 services:
   ingest:
@@ -60,13 +59,18 @@ services:
       WIKI_BASE_DIR: /data/base
       WIKI_LOCK_DIR: /data/lock
       INSTANCES_DIR: /app/JSONS/instances
-      WIKI_STATUS_PATH: /data/status/STATUS.json
+      # No WIKI_STATUS_PATH / status volume here on purpose -- the daemon no longer
+      # self-reports its own health (a hung/dead process can't report its own death).
+      # DSI-Wiki-Ingest-Events-Path only, still written for content (feed/last_ingest),
+      # health is judged externally by TOOLS/write_ingest_status.py (host cron, every
+      # minute, docker inspect) -- see that script's header.
+      WIKI_INGEST_EVENTS_PATH: /data/events/ingest_events.json
     volumes:
       - ${WIKI_RAW_DIR:?set WIKI_RAW_DIR in .env}:/data/raw
       - ${WIKI_ARCHIVE_DIR:?set WIKI_ARCHIVE_DIR in .env}:/data/archive
       - ${WIKI_BASE_DIR:?set WIKI_BASE_DIR in .env}:/data/base
       - ${WIKI_LOCK_DIR:-/tmp/dsi-wiki-lock}:/data/lock
-      - wiki-status:/data/status
+      - ${WIKI_INGEST_EVENTS_DIR:-/BIG/PROJECTS/DSI/DSI-WIKI/DATA/events}:/data/events
       # Live-editable config, no rebuild needed to pick up a layer-prompt/routing change --
       # see Dockerfile's own comment on why these were ever baked in separately.
       - ../JSONS/instances:/app/JSONS/instances:ro
@@ -88,6 +92,8 @@ services:
       LLM_WIKI_RAW_DIR: /data/raw
       WIKI_BASE_DIR: /data/base
       INSTANCES_DIR: /app/JSONS/instances
+      # Host bind mount, not a Docker-managed volume -- TOOLS/write_ingest_status.py
+      # (host cron, every minute) is the sole writer, from outside any container.
       WIKI_STATUS_PATH: /data/status/STATUS.json
       SHARED_WIDGETS_DIR: /data/shared-widgets
     ports:
@@ -95,12 +101,9 @@ services:
     volumes:
       - ${WIKI_RAW_DIR:?set WIKI_RAW_DIR in .env}:/data/raw
       - ${WIKI_BASE_DIR:?set WIKI_BASE_DIR in .env}:/data/base:ro
-      - wiki-status:/data/status:ro
+      - ${WIKI_STATUS_DIR:-/BIG/PROJECTS/DSI/DSI-WIKI/DATA/status}:/data/status:ro
       - ../JSONS/instances:/app/JSONS/instances:ro
       - ../JSONS/DSI-Wiki-HTTP-Config.json:/app/JSONS/DSI-Wiki-HTTP-Config.json:ro
       # service-widget.js: one shared file, authored in DSI-BEHOLDER's own repo, bind-mounted
       # here too rather than duplicated -- see /http/dashboard's Services widget.
       - ${SHARED_WIDGETS_DIR:-/BIG/_COMMON/dsi-widgets}:/data/shared-widgets:ro
-
-volumes:
-  wiki-status:
