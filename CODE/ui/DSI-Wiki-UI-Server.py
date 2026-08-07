@@ -190,6 +190,13 @@ function fetchInstances() {{
     currentInstance = data.default || data.instances[0];
     sel.value = currentInstance;
     fetchTopics();
+    const deepLinkParams = new URLSearchParams(location.search);
+    const deepLinkTopic = deepLinkParams.get('topic');
+    const deepLinkLayer = deepLinkParams.get('layer');
+    if (deepLinkTopic) {{
+      if (deepLinkLayer) document.getElementById('layer').value = deepLinkLayer;
+      loadContent(deepLinkTopic);
+    }}
   }});
 }}
 
