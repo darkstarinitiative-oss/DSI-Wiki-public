@@ -11,6 +11,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 
 from starlette.applications import Starlette
 from starlette.responses import HTMLResponse, JSONResponse
@@ -380,8 +381,8 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
   .card {{ margin-bottom: 1.5rem; }}
   .stat-label {{ color: var(--bs-secondary-color); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }}
   .stat-value {{ font-size: 1.05rem; }}
-  #topic-list-w2 {{ max-height: 260px; overflow-y: auto; }}
-  #topic-list-w2 .list-group-item {{ font-size: 0.85rem; }}
+  #topic-table-wrap {{ max-height: 320px; overflow-y: auto; }}
+  #topic-list-w2 tr td, #topic-list-w2 tr th {{ font-size: 0.85rem; }}
 </style>
 <!-- Shared with DSI-BEHOLDER's own dashboard -- see /BIG/_COMMON/dsi-widgets/service-widget.js.
      Restart/Stop route through this gateway's own /api/controls|action_status|action/* (see
@@ -415,21 +416,42 @@ DASHBOARD_HTML = f"""<!DOCTYPE html>
   </div>
 
   <div class="card">
-    <div class="card-header">Main topics</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Topics</span>
+      <div class="d-flex align-items-center gap-2">
+        <select id="topic-type-filter" class="form-select form-select-sm" style="width:auto;">
+          <option value="ALL">All types</option>
+          <option value="MAIN">MAIN</option>
+          <option value="SUB">SUB</option>
+          <option value="INDEP">INDEP</option>
+        </select>
+        <select id="topic-instance-select" class="form-select form-select-sm" style="width:auto;"></select>
+        <button id="topic-add-toggle" type="button" class="btn btn-primary btn-sm">+</button>
+      </div>
+    </div>
     <div class="card-body">
-      <div id="topic-list-w2" class="list-group mb-3"></div>
-      <form id="create-form" class="row g-2 align-items-start">
-        <div class="col-12 col-md-4">
-          <input id="new-topic-name" class="form-control form-control-sm" placeholder="MAIN_YourTopic / SUB_Main_Sub / INDEP_Topic" required>
-        </div>
-        <div class="col-12 col-md-6">
-          <textarea id="new-topic-content" class="form-control form-control-sm" rows="2" placeholder="raw note content (optional)"></textarea>
-        </div>
-        <div class="col-12 col-md-2">
-          <button type="submit" class="btn btn-primary btn-sm w-100">Add topic</button>
-        </div>
-      </form>
-      <div id="create-result" class="mt-2"></div>
+      <div id="create-popup" class="border rounded p-2 mb-3" style="display:none;">
+        <form id="create-form" class="row g-2 align-items-start">
+          <div class="col-12 col-md-4">
+            <input id="new-topic-name" class="form-control form-control-sm" placeholder="MAIN_YourTopic / SUB_Main_Sub / INDEP_Topic" required>
+          </div>
+          <div class="col-12 col-md-6">
+            <textarea id="new-topic-content" class="form-control form-control-sm" rows="2" placeholder="raw note content (optional)"></textarea>
+          </div>
+          <div class="col-12 col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Add topic</button>
+          </div>
+        </form>
+        <div id="create-result" class="mt-2"></div>
+      </div>
+      <div id="topic-table-wrap">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr><th>Konu</th><th>Tür</th><th class="text-end">Actions</th></tr>
+          </thead>
+          <tbody id="topic-list-w2"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -440,14 +462,19 @@ let currentInstance = null;
 function fetchInstances() {{
   fetch('api/instances').then(r => r.json()).then(data => {{
     const sel = document.getElementById('instance');
+    const topicSel = document.getElementById('topic-instance-select');
     sel.innerHTML = '';
+    topicSel.innerHTML = '';
     data.instances.forEach(name => {{
-      const opt = document.createElement('option');
-      opt.value = name; opt.textContent = name;
-      sel.appendChild(opt);
+      [sel, topicSel].forEach(s => {{
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        s.appendChild(opt);
+      }});
     }});
     currentInstance = data.default || data.instances[0];
     sel.value = currentInstance;
+    topicSel.value = currentInstance;
     refreshTopics();
   }});
 }}
@@ -470,10 +497,10 @@ function refreshHealth() {{
     const li = s.last_ingest || {{}};
     const grid = document.getElementById('health-grid');
     grid.innerHTML = [
-      statCol('Ingest last poll', timeAgo(s.last_poll_ts)),
+      statCol('Ingest checked', timeAgo(s.checked_at)),
       statCol('Raw queue', data.raw_queue_count === null ? 'n/a' : data.raw_queue_count + ' file(s)'),
-      statCol('Ollama model', s.ollama_model || 'n/a'),
-      statCol('Service version', (s.service_version || 'n/a') + (s.git_commit ? ' @' + s.git_commit : '')),
+      statCol('Ingest status', s.status === 'ok' ? '<span class="badge text-bg-success">ok</span>' : (s.status ? `<span class="badge text-bg-danger">${{s.status}}</span>` : 'n/a')),
+      statCol('Git commit', s.git_commit || 'n/a'),
       statCol('Last ingest topic', li.topic || 'n/a'),
       statCol('Last ingest result', li.ok === true ? '<span class="badge text-bg-success">ok</span>' : (li.ok === false ? '<span class="badge text-bg-danger">failed</span>' : 'n/a')),
       statCol('Last ingest finished', timeAgo(li.finished_at)),
@@ -507,19 +534,85 @@ function refreshHealth() {{
   }});
 }}
 
+let allTopics = [];
+
+function topicType(t) {{
+  if (t.startsWith('MAIN_')) return 'MAIN';
+  if (t.startsWith('SUB_')) return 'SUB';
+  if (t.startsWith('INDEP_')) return 'INDEP';
+  return 'OTHER';
+}}
+
+function renderTopicRows() {{
+  const filterType = document.getElementById('topic-type-filter').value;
+  const el = document.getElementById('topic-list-w2');
+  const rows = allTopics
+    .filter(t => filterType === 'ALL' || topicType(t) === filterType)
+    .sort();
+  el.innerHTML = rows.length ? rows.map(t => `
+    <tr data-topic="${{t}}">
+      <td>${{t}}</td>
+      <td><span class="badge text-bg-secondary">${{topicType(t)}}</span></td>
+      <td class="text-end">
+        <button type="button" class="btn btn-outline-danger btn-sm topic-delete-btn">sil</button>
+        <button type="button" class="btn btn-outline-warning btn-sm topic-factcheck-btn">fact-check</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="3" class="text-secondary small">No topics for this filter.</td></tr>';
+}}
+
 function refreshTopics() {{
   fetch(`api/all_topics?instance=${{encodeURIComponent(currentInstance)}}`).then(r => r.json()).then(data => {{
-    const mains = (data.topics || []).filter(t => t.startsWith('MAIN_')).sort();
-    const el = document.getElementById('topic-list-w2');
-    el.innerHTML = mains.length
-      ? mains.map(t => `<div class="list-group-item bg-transparent">${{t}}</div>`).join('')
-      : '<div class="text-secondary small">No MAIN_ topics yet for this instance.</div>';
+    allTopics = data.topics || [];
+    renderTopicRows();
   }});
 }}
 
 document.getElementById('instance').addEventListener('change', e => {{
   currentInstance = e.target.value;
+  document.getElementById('topic-instance-select').value = currentInstance;
   refreshTopics();
+}});
+
+document.getElementById('topic-instance-select').addEventListener('change', e => {{
+  currentInstance = e.target.value;
+  document.getElementById('instance').value = currentInstance;
+  refreshHealth();
+  refreshTopics();
+}});
+
+document.getElementById('topic-type-filter').addEventListener('change', renderTopicRows);
+
+document.getElementById('topic-add-toggle').addEventListener('click', () => {{
+  const popup = document.getElementById('create-popup');
+  popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+}});
+
+document.getElementById('topic-list-w2').addEventListener('click', e => {{
+  const row = e.target.closest('tr[data-topic]');
+  if (!row) return;
+  const topic = row.dataset.topic;
+  if (e.target.classList.contains('topic-delete-btn')) {{
+    if (!confirm(`Delete ${{topic}} across all layers? This cannot be undone.`)) return;
+    e.target.disabled = true;
+    e.target.textContent = 'wait...';
+    fetch('api/delete_topic_request', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{topic}})
+    }}).then(() => {{
+      row.querySelectorAll('button').forEach(b => b.disabled = true);
+      row.style.opacity = '0.5';
+    }});
+  }} else if (e.target.classList.contains('topic-factcheck-btn')) {{
+    if (!confirm(`Queue a fact-check for ${{topic}}?`)) return;
+    e.target.disabled = true;
+    e.target.textContent = 'wait...';
+    fetch('api/factcheck_request', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{topic}})
+    }}).then(() => {{
+      e.target.textContent = 'queued';
+    }});
+  }}
 }});
 
 document.getElementById('create-form').addEventListener('submit', e => {{
@@ -738,6 +831,36 @@ async def api_create_topic(request):
     return JSONResponse({"created": topic, "path": path})
 
 
+def _write_ops_request(op: str, topic: str):
+    """Queues a request for TOOLS/process_topic_ops.py (host cron, every minute) --
+    same fire-and-forget shape as api_create_topic above, just a different watched
+    subdirectory. This gateway never touches base_dir directly (its mount is
+    read-only) and never runs the delete/fact-check itself -- see that script's
+    header for why it's a separate host-native cron job, not folded into this
+    request handler or into the ingest daemon's own loop."""
+    if not RAW_DIR:
+        return JSONResponse({"error": "LLM_WIKI_RAW_DIR not configured on this gateway"}, status_code=500)
+    if not TOPIC_RE.match(topic):
+        return JSONResponse({"error": "invalid topic name"}, status_code=400)
+    ops_dir = os.path.join(RAW_DIR, "_ops")
+    os.makedirs(ops_dir, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    path = os.path.join(ops_dir, f"{op}__{topic}__{ts}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"op": op, "topic": topic}, f)
+    return JSONResponse({"queued": op, "topic": topic})
+
+
+async def api_delete_topic_request(request):
+    body = await request.json()
+    return _write_ops_request("delete", (body.get("topic") or "").strip())
+
+
+async def api_factcheck_request(request):
+    body = await request.json()
+    return _write_ops_request("factcheck", (body.get("topic") or "").strip())
+
+
 def build_app(scan_dir):
     app = Starlette(routes=[
         Route("/", index),
@@ -750,6 +873,8 @@ def build_app(scan_dir):
         Route("/api/pin", api_pin, methods=["POST"]),
         Route("/api/health", api_health),
         Route("/api/create_topic", api_create_topic, methods=["POST"]),
+        Route("/api/delete_topic_request", api_delete_topic_request, methods=["POST"]),
+        Route("/api/factcheck_request", api_factcheck_request, methods=["POST"]),
         Route("/api/services", api_services_proxy),
         Route("/api/controls", api_controls_proxy),
         Route("/api/action_status", api_action_status_proxy),

@@ -323,14 +323,28 @@ def apply_fixes(doc_path: Path, fixes: list[tuple[str, str]], base_dir: Path, to
     return applied
 
 
+def _factcheck_one(instance: dict, doc_path: Path, base_dir: Path, topic: str, log) -> None:
+    doc_text = doc_path.read_text(encoding="utf-8")
+    try:
+        fixes = factcheck_topic(topic, doc_text)
+    except Exception as e:
+        log(f"{instance['name']}/{topic}: ERROR {e}")
+        return
+    applied = apply_fixes(doc_path, fixes, base_dir, topic)
+    log(f"{instance['name']}/{topic}: {len(fixes)} found, {applied} applied")
+
+
 def main():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    only_topic = sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == "--topic" else None
+
     # Local time, not UTC: the healthcheck script matches today's log by local
     # calendar date (date.today()), and this timer fires in the local early
     # morning (UTC+3) — a UTC timestamp here would land on the previous UTC
     # day and the healthcheck would never find the file.
     run_id = datetime.now().astimezone().strftime("%Y-%m-%d_%H%M")
-    log_path = LOG_DIR / f"{run_id}.log"
+    tag = f"ondemand-{only_topic}" if only_topic else "run"
+    log_path = LOG_DIR / f"{tag}-{run_id}.log" if only_topic else LOG_DIR / f"{run_id}.log"
 
     # Written incrementally (one flush per topic) rather than assembled in
     # memory and written once at the end: a TimeoutStartSec kill or crash
@@ -342,28 +356,41 @@ def main():
         with log_path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-    log(f"Nightly fact-check run {run_id}")
+    if only_topic:
+        log(f"On-demand fact-check: {only_topic} ({run_id})")
+    else:
+        log(f"Nightly fact-check run {run_id}")
 
+    found = False
     for instance_file in sorted(INSTANCES_DIR.glob("*.json")):
         instance = json.loads(instance_file.read_text())
         if not instance.get("enabled"):
             continue
-        base_dir = Path(instance["base_dir"])
+        # instance["base_dir"] is /data/base (container-internal, 2026-08-06 bind-mount
+        # refactor) -- this script runs host-native, so it needs the real host path, not
+        # that field. WIKI_BASE_DIR (required above) is it. Only correct as long as every
+        # enabled instance shares the one base_dir docker-compose.yml actually mounts --
+        # true multi-instance (each with its own real base_dir) isn't wired into the
+        # compose mounts yet either, so this doesn't newly break anything that worked.
+        base_dir = Path(WIKI_BASE_DIR)
         doc_dir = base_dir / "documentation"
         if not doc_dir.is_dir():
+            continue
+        if only_topic:
+            doc_path = doc_dir / f"{only_topic}.md"
+            if doc_path.is_file():
+                found = True
+                _factcheck_one(instance, doc_path, base_dir, only_topic, log)
             continue
         for doc_path in sorted(doc_dir.glob("MAIN_*.md")):
             topic = doc_path.stem
             if topic in SKIP_TOPICS or topic.startswith("OBSOLETE_"):
                 continue
-            doc_text = doc_path.read_text(encoding="utf-8")
-            try:
-                fixes = factcheck_topic(topic, doc_text)
-            except Exception as e:
-                log(f"{instance['name']}/{topic}: ERROR {e}")
-                continue
-            applied = apply_fixes(doc_path, fixes, base_dir, topic)
-            log(f"{instance['name']}/{topic}: {len(fixes)} found, {applied} applied")
+            _factcheck_one(instance, doc_path, base_dir, topic, log)
+
+    if only_topic and not found:
+        log(f"{only_topic}: not found in any enabled instance's documentation/")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
